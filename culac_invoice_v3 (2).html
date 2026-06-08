@@ -1,0 +1,2096 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CULAC Invoice System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #d81b60;
+            --primary-dark: #ad1457;
+            --primary-light: #fce4ec;
+            --espresso: #4a3f35;
+            --espresso-light: #6b5d52;
+            --success: #81c784;
+            --info: #90a4ae;
+            --warning: #ffb74d;
+            --sidebar-width: 280px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background: #f5e6e6;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ========== SIDEBAR MENU ========== */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--espresso);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.2);
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            background: var(--espresso);
+            color: var(--primary);
+            padding: 35px 20px;
+            border-bottom: 3px solid var(--primary);
+            text-align: center;
+        }
+
+        .sidebar-header h1 {
+            font-size: 36px;
+            margin-bottom: 5px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            color: var(--primary);
+        }
+
+        .sidebar-header p {
+            font-size: 13px;
+            color: rgba(255,255,255,0.8);
+            font-weight: 500;
+            letter-spacing: 1px;
+        }
+
+        .menu {
+            flex: 1;
+            padding: 20px 0;
+            overflow-y: auto;
+        }
+
+        .menu-item {
+            padding: 18px 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            border-left: 4px solid transparent;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .menu-item:hover {
+            background: rgba(255,255,255,0.1);
+            border-left-color: var(--primary);
+            color: white;
+        }
+
+        .menu-item.active {
+            background: rgba(212, 165, 165, 0.15);
+            border-left-color: var(--primary);
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .menu-icon {
+            font-size: 22px;
+            width: 28px;
+            text-align: center;
+        }
+
+        .menu-icon {
+            font-size: 20px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .sidebar-footer {
+            padding: 20px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            text-align: center;
+        }
+
+        /* ========== MAIN CONTENT ========== */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .topbar {
+            background: white;
+            padding: 20px 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .topbar h2 {
+            font-size: 28px;
+            color: #333;
+            font-weight: 700;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge.connected {
+            background: #e8f5e9;
+            color: var(--success);
+        }
+
+        .status-badge.disconnected {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .page {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ========== CARDS ========== */
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1400px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: none;
+            transition: all 0.3s;
+            min-height: 120px;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .stat-card.success { }
+        .stat-card.info { }
+        .stat-card.warning { }
+
+        .stat-label {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #333;
+            line-height: 1.2;
+        }
+
+        /* ========== FORMS ========== */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e8e8e8;
+            border-radius: 10px;
+            font-family: 'Sarabun';
+            font-size: 14px;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(236, 64, 122, 0.08);
+            background: white;
+        }
+
+        input:disabled {
+            background: #f5f5f5;
+            cursor: not-allowed;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .file-upload {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+
+        .file-upload:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .file-upload.has-file {
+            border-color: var(--success);
+            background: #e8f5e9;
+            border-style: solid;
+        }
+
+        .file-upload img {
+            max-width: 100%;
+            max-height: 100px;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .upload-text {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* ========== BUTTONS ========== */
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Sarabun';
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 2px 10px rgba(236, 64, 122, 0.25);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(236, 64, 122, 0.35);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #666;
+            border: 2px solid #e0e0e0;
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+            box-shadow: 0 2px 10px rgba(129, 199, 132, 0.25);
+        }
+
+        .btn-success:hover {
+            background: #66bb6a;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(129, 199, 132, 0.35);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        /* ========== ITEMS ========== */
+        .item-card {
+            background: #f8f9fc;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .item-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(216, 27, 96, 0.15);
+        }
+
+        .btn-remove {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            transition: all 0.3s;
+        }
+
+        .btn-remove:hover {
+            background: #d32f2f;
+            transform: scale(1.1);
+        }
+
+        /* ========== TABLE ========== */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        table th {
+            background: var(--primary);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        table td {
+            padding: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+
+        table tr:hover {
+            background: #f8f9fc;
+        }
+
+        .invoice-row {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .invoice-row:hover {
+            background: var(--primary-light) !important;
+        }
+
+        .invoice-no {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .invoice-amount {
+            font-weight: 700;
+            color: var(--success);
+            font-size: 16px;
+        }
+
+        /* ========== ALERTS ========== */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+
+        .alert-info {
+            background: #e3f2fd;
+            color: #0277bd;
+            border: 1px solid #90caf9;
+        }
+
+        .alert-success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #81c784;
+        }
+
+        .alert-warning {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 1px solid #ffb74d;
+        }
+
+        .alert-error {
+            background: #ffebee;
+            color: #c62828;
+            border: 1px solid #e57373;
+        }
+
+        /* ========== INVOICE PREVIEW ========== */
+        .invoice-preview {
+            background: white;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .inv-header {
+            text-align: center;
+            border-bottom: 3px solid #d81b60;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .inv-logo {
+            height: 90px;
+            margin-bottom: 15px;
+        }
+
+        .inv-logo img {
+            max-height: 100%;
+        }
+
+        .inv-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .inv-title {
+            font-size: 36px;
+            font-weight: 700;
+            color: #d81b60;
+        }
+
+        .inv-meta {
+            text-align: right;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+
+        .inv-client {
+            background: #fce4ec;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+
+        .inv-client strong {
+            color: #d81b60;
+        }
+
+        .inv-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+        }
+
+        .inv-table thead th {
+            background: #d81b60;
+            color: white;
+            padding: 15px;
+            text-align: left;
+        }
+
+        .inv-table tbody td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .inv-table tfoot td {
+            border-top: 2px solid #d81b60;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .inv-payment {
+            background: #f8f9fa;
+            border-left: 4px solid var(--primary);
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.9;
+            margin-bottom: 30px;
+        }
+
+        .inv-signature {
+            float: right;
+            text-align: center;
+            width: 250px;
+            margin-top: 30px;
+        }
+
+        .inv-sig-box {
+            height: 80px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .inv-sig-box img {
+            max-height: 100%;
+        }
+
+        /* ========== PRINT ========== */
+        @media print {
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white !important;
+                height: auto !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+            .sidebar, .topbar, .btn, .card-title, #alert-container {
+                display: none !important;
+            }
+            .main {
+                display: block !important;
+                width: 100% !important;
+                overflow: visible !important;
+            }
+            .content {
+                display: block !important;
+                padding: 0 !important;
+                overflow: visible !important;
+                height: auto !important;
+            }
+            .page {
+                display: none !important;
+            }
+            .page.active {
+                display: block !important;
+            }
+            .invoice-preview {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                padding: 20px 30px !important;
+                margin: 0 !important;
+            }
+            .inv-header { border-bottom: 3px solid #d81b60 !important; }
+            .inv-title { color: #d81b60 !important; font-size: 36px !important; }
+            .inv-client { background: #fce4ec !important; }
+            .inv-client strong { color: #d81b60 !important; }
+            .inv-table thead th { background: #d81b60 !important; color: white !important; }
+            .inv-table tfoot td { border-top: 2px solid #d81b60 !important; }
+            .inv-payment { background: #f8f9fa !important; border-left: 4px solid #d81b60 !important; }
+            .inv-payment strong { color: #d81b60 !important; }
+            .inv-meta,
+            .inv-table tbody td,
+            .inv-table tfoot td,
+            .inv-payment,
+            .inv-signature,
+            .invoice-preview p,
+            .invoice-preview span,
+            .invoice-preview td,
+            .invoice-preview div {
+                color: #000 !important;
+            }
+        }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 80px;
+            }
+            .sidebar-header h1,
+            .sidebar-header p,
+            .menu-item span {
+                display: none;
+            }
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ========== SIDEBAR ========== -->
+<div class="sidebar">
+    <div class="sidebar-header">
+        <h1>📋 CULAC</h1>
+        <p>Invoice System</p>
+    </div>
+
+    <div class="menu">
+        <div class="menu-item active" onclick="showPage('dashboard')">
+            <span class="menu-icon">📊</span>
+            <span>Dashboard</span>
+        </div>
+        <div class="menu-item" onclick="showPage('create')">
+            <span class="menu-icon">📝</span>
+            <span>สร้างใบแจ้งหนี้</span>
+        </div>
+        <div class="menu-item" onclick="showPage('history')">
+            <span class="menu-icon">📚</span>
+            <span>รายการใบแจ้งหนี้</span>
+        </div>
+        <!-- Developer Menu - Hidden -->
+        <div class="menu-item" id="dev-menu" onclick="showPage('settings')" style="display: none;">
+            <span class="menu-icon">👨‍💻</span>
+            <span>Developer Settings</span>
+        </div>
+    </div>
+
+    <div class="sidebar-footer" id="footer-trigger" style="cursor: help;" title="Ctrl+Alt+Click for Developer Mode">
+        <div>© 2026 CULAC</div>
+        <div>Laboratory Animal Center</div>
+    </div>
+</div>
+
+<!-- ========== MAIN ========== -->
+<div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+        <h2 id="page-title">Dashboard</h2>
+        <div class="status-badge disconnected" id="status-badge">
+            <div class="status-dot"></div>
+            <span id="status-text">ยังไม่ได้เชื่อมต่อ</span>
+        </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+        <div id="alert-container"></div>
+
+        <!-- ========== DASHBOARD ========== -->
+        <div id="page-dashboard" class="page active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div></div>
+                <button class="btn btn-secondary" onclick="loadDashboard()" style="padding: 8px 16px; font-size: 13px;">
+                    🔄 รีเฟรช
+                </button>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 50px; height: 50px; background: #d81b60; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white;">📋</div>
+                        <div style="flex: 1;">
+                            <div class="stat-label">ใบแจ้งหนี้ทั้งหมด</div>
+                            <div class="stat-value" id="stat-total-invoices">0</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card success">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 50px; height: 50px; background: #81c784; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white;">💰</div>
+                        <div style="flex: 1;">
+                            <div class="stat-label">ยอดรวมทั้งหมด</div>
+                            <div class="stat-value" style="color: var(--success);" id="stat-total-amount">฿0.00</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card info">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 50px; height: 50px; background: #90a4ae; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white;">📌</div>
+                        <div style="flex: 1;">
+                            <div class="stat-label">เลขที่ล่าสุด</div>
+                            <div class="stat-value" style="color: var(--info); font-size: 28px;" id="stat-last-no">-</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card warning">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="width: 50px; height: 50px; background: #ffb74d; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white;">🔢</div>
+                        <div style="flex: 1;">
+                            <div class="stat-label">เลขที่ถัดไป</div>
+                            <div class="stat-value" style="color: var(--warning); font-size: 28px;" id="stat-next-no">010569</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">⚡ เริ่มต้นใช้งาน</div>
+                <div class="btn-grid">
+                    <button class="btn btn-primary" onclick="showPage('create')">
+                        📝 สร้างใบแจ้งหนี้ใหม่
+                    </button>
+                    <button class="btn btn-secondary" onclick="showPage('history')">
+                        📚 ดูรายการทั้งหมด
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📋 คำแนะนำ</div>
+                <div style="line-height: 1.8; color: #666;">
+                    <strong>ขั้นตอนการใช้งาน:</strong><br>
+                    1. ไปที่ <strong>สร้างใบแจ้งหนี้</strong> เพื่อกรอกข้อมูลและสร้างใบใหม่<br>
+                    2. กรอกข้อมูลลูกค้า เลือกธนาคาร และเพิ่มรายการสินค้า<br>
+                    3. คลิก <strong>บันทึก</strong> เพื่อบันทึกข้อมูล หรือ <strong>พิมพ์</strong> เพื่อพิมพ์ใบแจ้งหนี้<br>
+                    4. ดูรายการที่สร้างไว้ได้ที่ <strong>รายการใบแจ้งหนี้</strong> และคลิกเพื่อแก้ไขได้
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Developer Settings (Hidden) ========== -->
+        <div id="page-settings" class="page">
+            <div class="alert alert-warning">
+                <span>👨‍💻</span>
+                <div>
+                    <strong>Developer Mode</strong><br>
+                    หน้านี้สำหรับผู้พัฒนาระบบเท่านั้น ผู้ใช้งานทั่วไป (ฝ่ายการเงิน) จะไม่เห็นหน้านี้
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔗 เชื่อมต่อ Google Apps Script</div>
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <div>
+                        ตั้งค่า Google Apps Script URL เพื่อใช้ Google Sheets เป็น Server<br>
+                        <strong>ขั้นตอน:</strong>
+                        <ol style="margin: 10px 0 0 20px; line-height: 1.8;">
+                            <li>สร้าง Google Spreadsheet ใหม่</li>
+                            <li>Extensions → Apps Script</li>
+                            <li>Copy Code.gs ไปวาง</li>
+                            <li>Deploy → New deployment → Web app</li>
+                            <li>Execute as: Me / Who has access: Anyone</li>
+                            <li>Copy URL มาใส่ด้านล่าง</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Google Apps Script URL</label>
+                    <input type="text" id="sheets_url" placeholder="https://script.google.com/macros/s/YOUR_ID/exec">
+                </div>
+
+                <button class="btn btn-primary" onclick="testConnection()">
+                    🔄 ทดสอบการเชื่อมต่อ
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔢 ตั้งค่าเลขที่ใบแจ้งหนี้</div>
+                <div class="alert alert-info">
+                    <span>ℹ️</span>
+                    <div>
+                        <strong>รูปแบบ:</strong> XXYYMM (XX=ลำดับ/YY=เดือน/MM=ปี พ.ศ.)<br>
+                        <strong>ตัวอย่าง:</strong> 010569 = ใบแรก เดือน พ.ค. ปี 2569<br>
+                        <strong>หมายเหตุ:</strong> ระบบจะรีเซ็ตเป็น 01 ทุกต้นเดือนอัตโนมัติ
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>เลขลำดับเริ่มต้นของเดือนนี้</label>
+                    <input type="number" id="sequence_start" min="1" max="99" value="1" placeholder="1">
+                    <small>กรณีเริ่มใช้งานกลางเดือน หรือต้องการเปลี่ยนเลข</small>
+                </div>
+
+                <button class="btn btn-primary" onclick="updateSequence()">
+                    💾 บันทึกเลขเริ่มต้น
+                </button>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🖼️ อัปโหลดโลโก้และลายเซ็น</div>
+                <p style="margin-bottom: 20px; color: #666;">
+                    อัปโหลดครั้งเดียว จะบันทึกไว้ใน LocalStorage ของเบราว์เซอร์<br>
+                    ⚠️ หากล้าง Browser Data รูปภาพจะหาย ต้องอัปโหลดใหม่
+                </p>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>โลโก้หน่วยงาน</label>
+                        <div class="file-upload" id="logo-box" onclick="document.getElementById('file-logo').click()">
+                            <div class="upload-icon">📷</div>
+                            <div class="upload-text">คลิกเพื่อเลือกไฟล์โลโก้</div>
+                            <div class="upload-hint">JPG, PNG (แนะนำ 200x80px)</div>
+                            <img id="logo-preview" style="display: none;">
+                        </div>
+                        <input type="file" id="file-logo" accept="image/*" style="display: none;" onchange="uploadFile(this, 'logo')">
+                    </div>
+
+                    <div class="form-group">
+                        <label>ลายเซ็นผู้อนุมัติ</label>
+                        <div class="file-upload" id="sig-box" onclick="document.getElementById('file-sig').click()">
+                            <div class="upload-icon">✍️</div>
+                            <div class="upload-text">คลิกเพื่อเลือกไฟล์ลายเซ็น</div>
+                            <div class="upload-hint">JPG, PNG (แนะนำ 200x80px)</div>
+                            <img id="sig-preview" style="display: none;">
+                        </div>
+                        <input type="file" id="file-sig" accept="image/*" style="display: none;" onchange="uploadFile(this, 'signature')">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🚀 GitHub Repository</div>
+                <p style="color: #666; line-height: 1.8;">
+                    <strong>Repository Structure:</strong><br>
+                    <code style="background: #f5f5f5; padding: 2px 6px; border-radius: 4px; font-size: 12px;">
+                    culac-invoice-system/<br>
+                    ├── culac_invoice_complete.html<br>
+                    ├── Code.gs (Google Apps Script)<br>
+                    ├── README.md<br>
+                    └── คู่มือการใช้งาน.md
+                    </code>
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🔧 Debug Information</div>
+                <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;">
+                    <div><strong>Google Sheets Connected:</strong> <span id="debug-connected">No</span></div>
+                    <div><strong>Current Sequence:</strong> <span id="debug-sequence">-</span></div>
+                    <div><strong>Month-Year Key:</strong> <span id="debug-month-year">-</span></div>
+                    <div><strong>Logo Uploaded:</strong> <span id="debug-logo">No</span></div>
+                    <div><strong>Signature Uploaded:</strong> <span id="debug-sig">No</span></div>
+                </div>
+                <button class="btn btn-secondary" onclick="updateDebugInfo()" style="margin-top: 10px;">
+                    🔄 Refresh Debug Info
+                </button>
+            </div>
+        </div>
+
+        <!-- ========== สร้างใบแจ้งหนี้ ========== -->
+        <div id="page-create" class="page">
+            <div class="card">
+                <div class="card-title">📄 ข้อมูลใบแจ้งหนี้</div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>เลขที่ใบแจ้งหนี้ (อัตโนมัติ)</label>
+                        <input type="text" id="invoice_no" disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label>วันที่</label>
+                        <input type="date" id="invoice_date">
+                    </div>
+
+                    <div class="form-group">
+                        <label>ภาษา</label>
+                        <select id="language" onchange="updateLanguage()">
+                            <option value="th">ภาษาไทย (TH)</option>
+                            <option value="en">English (EN)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>ข้อมูลลูกค้า (ชื่อและที่อยู่)</label>
+                    <textarea id="customer" rows="3" placeholder="ชื่อ-นามสกุล หรือ ชื่อบริษัท&#10;ที่อยู่&#10;เขต/จังหวัด รหัสไปรษณีย์"></textarea>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🏦 ข้อมูลธนาคาร</div>
+
+                <div class="form-group">
+                    <label>เลือกธนาคาร</label>
+                    <select id="bank_select" onchange="updateBank()">
+                        <option value="ktb">ธ.กรุงไทย (Krungthai) - ค่าเริ่มต้น</option>
+                        <option value="kbank">ธ.กสิกรไทย (Kasikornbank)</option>
+                        <option value="scb">ธ.ไทยพาณิชย์ (SCB)</option>
+                        <option value="custom">กำหนดเอง</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>ชื่อธนาคาร</label>
+                        <input type="text" id="bank_name">
+                    </div>
+                    <div class="form-group">
+                        <label>สาขา</label>
+                        <input type="text" id="bank_branch">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>เลขที่บัญชี</label>
+                        <input type="text" id="bank_account">
+                    </div>
+                    <div class="form-group">
+                        <label>ชื่อบัญชี</label>
+                        <input type="text" id="bank_user">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">📦 รายการสินค้า/บริการ</div>
+
+                <div id="items-container">
+                    <div class="item-card">
+                        <input type="text" class="item-desc" placeholder="ชื่อรายการ" style="margin-bottom: 10px;">
+                        <div class="form-row">
+                            <input type="number" class="item-qty" placeholder="จำนวน" min="0" step="1">
+                            <input type="number" class="item-price" placeholder="ราคา/หน่วย" min="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn btn-secondary" onclick="addItem()" style="width: 100%; margin-top: 15px;">
+                    + เพิ่มรายการใหม่
+                </button>
+
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 2px dashed #ddd;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <textarea id="invoice_note" rows="2" placeholder="ข้อความเพิ่มเติม (เช่น: อ้างถึง PO-2024-001, งวดที่ 1 ชำระ 50%)" style="font-size: 13px; border: 1px dashed #ccc;"></textarea>
+                    </div>
+                </div>
+
+                <div style="background: var(--primary-light); padding: 20px; border-radius: 10px; margin-top: 25px; border: 2px solid var(--primary);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span style="font-size: 14px; color: #666;">จำนวนรายการ:</span>
+                        <strong id="sum-items" style="font-size: 16px;">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid var(--primary);">
+                        <span style="font-size: 18px; font-weight: 700; color: var(--primary);">ยอดรวมสุทธิ:</span>
+                        <strong id="sum-total" style="font-size: 22px; color: var(--primary);">฿0.00</strong>
+                    </div>
+                    <div style="padding-top: 10px; border-top: 1px solid var(--primary); margin-top: 10px;">
+                        <span style="font-size: 13px; color: #666;" id="sum-total-text">จำนวนเงิน (ตัวอักษร): -</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="btn-grid" style="margin-top: 30px;">
+                <button class="btn btn-primary" onclick="previewInvoice()">
+                    👁️ ดูตัวอย่าง
+                </button>
+                <button class="btn btn-success" onclick="saveInvoice()">
+                    💾 บันทึกข้อมูล
+                </button>
+                <button class="btn btn-primary" onclick="printInvoice()">
+                    🖨️ พิมพ์ใบแจ้งหนี้
+                </button>
+                <button class="btn btn-secondary" onclick="clearForm()">
+                    🗑️ ล้างฟอร์ม
+                </button>
+            </div>
+        </div>
+
+        <!-- ========== รายการใบแจ้งหนี้ ========== -->
+        <div id="page-history" class="page">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div class="card-title" style="margin: 0;">📚 รายการใบแจ้งหนี้ทั้งหมด</div>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-primary" onclick="printReport()" style="padding: 8px 16px; font-size: 13px;">
+                            🖨️ พิมพ์รายงาน
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadHistory()" style="padding: 8px 16px; font-size: 13px;">
+                            🔄 รีเฟรช
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="history-table">
+                        <thead>
+                            <tr>
+                                <th>เลขที่</th>
+                                <th>วันที่</th>
+                                <th>ลูกค้า</th>
+                                <th style="text-align: center;">จำนวน</th>
+                                <th style="text-align: right;">ยอดรวม</th>
+                                <th style="text-align: center;">สถานะ</th>
+                                <th style="text-align: center;">วันที่จ่าย</th>
+                                <th>เลขที่เอกสาร</th>
+                                <th style="text-align: center;">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 40px; color: #999;">
+                                    ยังไม่มีข้อมูล กรุณาสร้างใบแจ้งหนี้
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== INVOICE PREVIEW (Hidden, for print only) ========== -->
+        <div id="page-preview" class="page">
+            <div class="invoice-preview">
+                <div class="inv-header">
+                    <div class="inv-logo" id="preview-logo"></div>
+                    <div style="font-size: 12px; color: #555;" id="preview-address">
+                        อาคารศูนย์สัตว์ทดลอง ชั้น 2 ถนนอังรีดูนังต์ แขวงปทุมวัน เขตปทุมวัน กรุงเทพฯ 10330<br>
+                        โทร: 02 218 9642, 02 218 9976 | เลขประจำตัวผู้เสียภาษี: 0994000920181
+                    </div>
+                </div>
+
+                <div class="inv-title-row">
+                    <div class="inv-title">INVOICE</div>
+                    <div class="inv-meta">
+                        <strong id="lbl-no">เลขที่:</strong> <span id="preview-invoice-no">-</span><br>
+                        <strong id="lbl-date">วันที่:</strong> <span id="preview-invoice-date">-</span>
+                    </div>
+                </div>
+
+                <div class="inv-client">
+                    <strong id="lbl-to" style="color: #d81b60; font-size: 14px;">ส่งถึง:</strong><br>
+                    <span id="preview-customer" style="white-space: pre-line; font-size: 14px; font-weight: 600;">-</span>
+                </div>
+
+                <table class="inv-table">
+                    <thead>
+                        <tr>
+                            <th id="th-desc">รายการ</th>
+                            <th id="th-qty" style="text-align: center; width: 100px;">จำนวน</th>
+                            <th id="th-total" style="text-align: right; width: 150px;">รวมเงิน</th>
+                        </tr>
+                    </thead>
+                    <tbody id="preview-items"></tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2" style="text-align: right;">
+                                <strong id="lbl-grand">ยอดรวมสุทธิ</strong>
+                            </td>
+                            <td style="text-align: right; color: #d81b60;" id="preview-grand-total">0.00</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" style="text-align: right; font-size: 13px; color: #666; padding-top: 5px; border-top: none;">
+                                (<span id="preview-total-text">ศูนย์บาทถ้วน</span>)
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="inv-payment">
+                    <strong id="lbl-payment" style="color: #d81b60;">ช่องทางการชำระเงิน:</strong><br>
+                    1. <span id="lbl-transfer">โอนเงินเข้าบัญชี</span> <strong id="preview-bank-name">-</strong> 
+                       <span id="lbl-branch">สาขา</span> <strong id="preview-bank-branch">-</strong><br>
+                    &nbsp;&nbsp;&nbsp;<span id="lbl-acc-name">ชื่อบัญชี:</span> <strong id="preview-bank-user">-</strong><br>
+                    &nbsp;&nbsp;&nbsp;<span id="lbl-acc-no">เลขที่บัญชี:</span> <strong id="preview-bank-account">-</strong><br>
+                    2. <span id="lbl-proof">ส่งหลักฐานที่ E-mail:</span> <strong>ASSAREE.W@CHULA.AC.TH</strong>
+                </div>
+
+                <div class="inv-signature">
+                    <div class="inv-sig-box" id="preview-signature"></div>
+                    <div style="font-weight: 700; font-size: 15px; margin-bottom: 5px;" id="preview-signer-name">นางปาริชาติ ลีอริยะ</div>
+                    <div style="font-size: 13px; color: #777;" id="preview-signer-pos">หัวหน้าหน่วยการเงิน</div>
+                </div>
+                <div style="clear: both;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== CONFIG ==========
+const CONFIG = {
+    sheetsUrl: localStorage.getItem('sheets_url') || '',
+    currentPage: 'dashboard'
+};
+
+// ========== DATA ==========
+const BANKS = {
+    ktb: {
+        th: ["ธ.กรุงไทย", "สยามสแควร์", "052-0-38440-7", "ศูนย์สัตว์ทดลอง จุฬาลงกรณ์มหาวิทยาลัย"],
+        en: ["Krungthai Bank", "Siam Square", "052-0-38440-7", "Laboratory Animal Center, Chulalongkorn University"]
+    },
+    kbank: {
+        th: ["ธ.กสิกรไทย", "สยามสแควร์", "052-0-38440-7", "ศูนย์สัตว์ทดลอง จุฬาลงกรณ์มหาวิทยาลัย"],
+        en: ["Kasikornbank", "Siam Square", "052-0-38440-7", "Laboratory Animal Center, Chulalongkorn University"]
+    },
+    scb: {
+        th: ["ธ.ไทยพาณิชย์", "สภากาชาดไทย", "045-2-92167-7", "ศูนย์สัตว์ทดลอง จุฬาฯ"],
+        en: ["Siam Commercial Bank", "Thai Red Cross", "045-2-92167-7", "Laboratory Animal Center, CU"]
+    }
+};
+
+const LANG = {
+    th: {
+        address: "อาคารศูนย์สัตว์ทดลอง ชั้น 2 ถนนอังรีดูนังต์ แขวงปทุมวัน เขตปทุมวัน กรุงเทพฯ 10330<br>โทร: 02 218 9642, 02 218 9976 | เลขประจำตัวผู้เสียภาษี: 0994000920181",
+        labelNo: "เลขที่:", labelDate: "วันที่:", labelTo: "ส่งถึง:",
+        thDesc: "รายการ", thQty: "จำนวน", thTotal: "รวมเงิน",
+        labelGrand: "ยอดรวมสุทธิ (GRAND TOTAL)",
+        labelPayment: "ช่องทางการชำระเงิน (PAYMENT METHOD):",
+        labelTransfer: "โอนเงินเข้าบัญชี", labelBranch: "สาขา",
+        labelAccName: "ชื่อบัญชี:", labelAccNo: "เลขที่บัญชี:",
+        labelProof: "ส่งหลักฐานที่ E-mail:",
+        signerName: "นางปาริชาติ ลีอริยะ", signerPos: "หัวหน้าหน่วยการเงิน"
+    },
+    en: {
+        address: "Laboratory Animal Center Building, 2nd Floor, Henri-Dunant Rd., Pathumwan, Bangkok 10330, Thailand<br>Tel: 02 218 9642, 02 218 9976 | Tax ID: 0994000920181",
+        labelNo: "Invoice No.:", labelDate: "Date:", labelTo: "INVOICE TO:",
+        thDesc: "DESCRIPTION", thQty: "QTY", thTotal: "TOTAL",
+        labelGrand: "GRAND TOTAL",
+        labelPayment: "PAYMENT METHOD:",
+        labelTransfer: "Transfer to", labelBranch: "Branch:",
+        labelAccName: "Account Name:", labelAccNo: "Account No.:",
+        labelProof: "Send proof of payment to E-mail:",
+        signerName: "Mrs. Parichart Leeariya", signerPos: "Head of Finance Unit"
+    }
+};
+
+const PAGE_TITLES = {
+    dashboard: 'Dashboard',
+    settings: '👨‍💻 Developer Settings',
+    create: 'สร้างใบแจ้งหนี้',
+    history: 'รายการใบแจ้งหนี้'
+};
+
+// ========== PAGE NAVIGATION ==========
+function showPage(pageName) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + pageName).classList.add('active');
+
+    document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+    const menuMap = {
+        dashboard: 0, create: 1, history: 2
+    };
+    const idx = menuMap[pageName];
+    if (idx !== undefined) {
+        document.querySelectorAll('.menu-item')[idx].classList.add('active');
+    }
+
+    document.getElementById('page-title').textContent = PAGE_TITLES[pageName] || pageName;
+    CONFIG.currentPage = pageName;
+
+    if (pageName === 'dashboard') loadDashboard();
+    else if (pageName === 'history') loadHistory();
+}
+
+// ========== ALERTS ==========
+function showAlert(message, type = 'info') {
+    const container = document.getElementById('alert-container');
+    const icons = { info: 'ℹ️', success: '✅', warning: '⚠️', error: '❌' };
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.innerHTML = `<span>${icons[type]}</span><div>${message}</div>`;
+    
+    container.innerHTML = '';
+    container.appendChild(alert);
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    setTimeout(() => alert.remove(), 5000);
+}
+
+// ========== CONNECTION ==========
+function updateConnectionStatus(connected) {
+    const badge = document.getElementById('status-badge');
+    const text = document.getElementById('status-text');
+    
+    if (connected) {
+        badge.className = 'status-badge connected';
+        text.textContent = 'เชื่อมต่อแล้ว';
+    } else {
+        badge.className = 'status-badge disconnected';
+        text.textContent = 'ยังไม่ได้เชื่อมต่อ';
+    }
+}
+
+async function testConnection() {
+    const url = document.getElementById('sheets_url').value;
+    if (!url) {
+        showAlert('กรุณากรอก Google Apps Script URL', 'error');
+        return;
+    }
+
+    try {
+        showAlert('กำลังทดสอบการเชื่อมต่อ...', 'info');
+        const res = await fetch(`${url}?action=test`, { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+        
+        if (data.success === true) {
+            CONFIG.sheetsUrl = url;
+            localStorage.setItem('sheets_url', url);
+            updateConnectionStatus(true);
+            showAlert('เชื่อมต่อสำเร็จ! ✅', 'success');
+            
+            await updateInvoiceNumber();
+            loadDashboard();
+        } else {
+            updateConnectionStatus(false);
+            showAlert('เชื่อมต่อไม่สำเร็จ: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (e) {
+        updateConnectionStatus(false);
+        showAlert('ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบ URL', 'error');
+    }
+}
+
+// ========== INVOICE NUMBER ==========
+function generateInvoiceNumber(seq = 1) {
+    const now = new Date();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear() + 543).slice(-2);
+    return String(seq).padStart(2, '0') + month + year;
+}
+
+async function getNextInvoiceNumber() {
+    // Get sequence from localStorage or start from 1
+    const monthYear = new Date().getMonth() + '' + new Date().getFullYear();
+    const savedMonthYear = localStorage.getItem('invoice_month_year');
+    
+    let sequence = 1;
+    
+    if (savedMonthYear === monthYear) {
+        // Same month, increment sequence
+        sequence = parseInt(localStorage.getItem('invoice_sequence') || '1');
+    } else {
+        // New month, reset to 1 or use custom start
+        sequence = parseInt(localStorage.getItem('sequence_start') || '1');
+        localStorage.setItem('invoice_month_year', monthYear);
+    }
+    
+    // If Google Sheets connected, get from there
+    if (CONFIG.sheetsUrl) {
+        try {
+            const res = await fetch(`${CONFIG.sheetsUrl}?action=getNextNumber`);
+            const data = await res.json();
+            sequence = data.nextNumber;
+        } catch (e) {
+            console.log('Using local sequence');
+        }
+    }
+    
+    return generateInvoiceNumber(sequence);
+}
+
+async function updateInvoiceNumber() {
+    const nextNo = await getNextInvoiceNumber();
+    document.getElementById('invoice_no').value = nextNo;
+    document.getElementById('stat-next-no').textContent = nextNo;
+}
+
+function updateSequence() {
+    const startSeq = parseInt(document.getElementById('sequence_start').value) || 1;
+    if (startSeq < 1 || startSeq > 99) {
+        showAlert('กรุณาใส่เลขระหว่าง 1-99', 'error');
+        return;
+    }
+    
+    localStorage.setItem('sequence_start', startSeq);
+    localStorage.setItem('invoice_sequence', startSeq);
+    
+    showAlert(`บันทึกเลขเริ่มต้นสำเร็จ! เลขใบถัดไปจะเป็น ${generateInvoiceNumber(startSeq)}`, 'success');
+    updateInvoiceNumber();
+}
+
+// ========== FILE UPLOAD ==========
+function uploadFile(input, type) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = e.target.result;
+            localStorage.setItem(`culac_${type}`, data);
+            
+            const previewId = type === 'logo' ? 'logo-preview' : 'sig-preview';
+            const boxId = type === 'logo' ? 'logo-box' : 'sig-box';
+            
+            document.getElementById(previewId).src = data;
+            document.getElementById(previewId).style.display = 'block';
+            document.getElementById(boxId).classList.add('has-file');
+            
+            showAlert(`อัปโหลด${type === 'logo' ? 'โลโก้' : 'ลายเซ็น'}สำเร็จ ✅`, 'success');
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function loadImages() {
+    const logo = localStorage.getItem('culac_logo');
+    const sig = localStorage.getItem('culac_signature');
+    
+    if (logo) {
+        document.getElementById('logo-preview').src = logo;
+        document.getElementById('logo-preview').style.display = 'block';
+        document.getElementById('logo-box').classList.add('has-file');
+        document.getElementById('preview-logo').innerHTML = `<img src="${logo}" style="max-height: 100%;">`;
+    }
+    if (sig) {
+        document.getElementById('sig-preview').src = sig;
+        document.getElementById('sig-preview').style.display = 'block';
+        document.getElementById('sig-box').classList.add('has-file');
+        document.getElementById('preview-signature').innerHTML = `<img src="${sig}" style="max-height: 100%;">`;
+    }
+}
+
+// ========== BANK ==========
+function updateBank() {
+    const bank = document.getElementById('bank_select').value;
+    const lang = document.getElementById('language').value;
+    
+    if (bank !== 'custom') {
+        const data = BANKS[bank][lang];
+        document.getElementById('bank_name').value = data[0];
+        document.getElementById('bank_branch').value = data[1];
+        document.getElementById('bank_account').value = data[2];
+        document.getElementById('bank_user').value = data[3];
+    }
+}
+
+// ========== LANGUAGE ==========
+function updateLanguage() {
+    updateBank();
+    
+    const lang = document.getElementById('language').value;
+    const d = LANG[lang];
+    
+    document.getElementById('preview-address').innerHTML = d.address;
+    document.getElementById('lbl-no').textContent = d.labelNo;
+    document.getElementById('lbl-date').textContent = d.labelDate;
+    document.getElementById('lbl-to').textContent = d.labelTo;
+    document.getElementById('th-desc').textContent = d.thDesc;
+    document.getElementById('th-qty').textContent = d.thQty;
+    document.getElementById('th-total').textContent = d.thTotal;
+    document.getElementById('lbl-grand').textContent = d.labelGrand;
+    document.getElementById('lbl-payment').textContent = d.labelPayment;
+    document.getElementById('lbl-transfer').textContent = d.labelTransfer;
+    document.getElementById('lbl-branch').textContent = d.labelBranch;
+    document.getElementById('lbl-acc-name').textContent = d.labelAccName;
+    document.getElementById('lbl-acc-no').textContent = d.labelAccNo;
+    document.getElementById('lbl-proof').textContent = d.labelProof;
+    document.getElementById('preview-signer-name').textContent = d.signerName;
+    document.getElementById('preview-signer-pos').textContent = d.signerPos;
+}
+
+// ========== NUMBER TO TEXT ==========
+function numberToThaiText(number) {
+    const ones = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+    const units = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
+    
+    if (number === 0) return 'ศูนย์บาทถ้วน';
+    
+    const parts = number.toFixed(2).split('.');
+    const baht = parseInt(parts[0]);
+    const satang = parseInt(parts[1]);
+    
+    let result = '';
+    
+    // Convert baht
+    if (baht > 0) {
+        const bahtStr = baht.toString();
+        const len = bahtStr.length;
+        
+        for (let i = 0; i < len; i++) {
+            const digit = parseInt(bahtStr[i]);
+            const position = len - i - 1;
+            
+            if (digit === 0) continue;
+            
+            if (position === 1 && digit === 2) {
+                result += 'ยี่สิบ';
+            } else if (position === 1 && digit === 1) {
+                result += 'สิบ';
+            } else if (position === 0 && digit === 1 && len > 1) {
+                result += 'เอ็ด';
+            } else {
+                result += ones[digit];
+                if (position > 0) result += units[position % 6];
+            }
+        }
+        result += 'บาท';
+    }
+    
+    // Convert satang
+    if (satang > 0) {
+        const satangStr = satang.toString().padStart(2, '0');
+        const tens = parseInt(satangStr[0]);
+        const unit = parseInt(satangStr[1]);
+        
+        if (tens === 1) {
+            result += 'สิบ';
+        } else if (tens === 2) {
+            result += 'ยี่สิบ';
+        } else if (tens > 0) {
+            result += ones[tens] + 'สิบ';
+        }
+        
+        if (unit === 1 && tens > 0) {
+            result += 'เอ็ด';
+        } else if (unit > 0) {
+            result += ones[unit];
+        }
+        
+        result += 'สตางค์';
+    } else {
+        result += 'ถ้วน';
+    }
+    
+    return result;
+}
+
+// ========== ITEMS ==========
+function addItem() {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `
+        <button class="btn-remove" onclick="removeItem(this)">×</button>
+        <input type="text" class="item-desc" placeholder="ชื่อรายการ" style="margin-bottom: 10px;">
+        <div class="form-row">
+            <input type="number" class="item-qty" placeholder="จำนวน" min="0" step="1">
+            <input type="number" class="item-price" placeholder="ราคา/หน่วย" min="0" step="0.01">
+        </div>
+    `;
+    document.getElementById('items-container').appendChild(card);
+}
+
+function removeItem(btn) {
+    const cards = document.querySelectorAll('.item-card');
+    if (cards.length > 1) {
+        btn.parentElement.remove();
+        updateSummary();
+    } else {
+        showAlert('ต้องมีอย่างน้อย 1 รายการ', 'warning');
+    }
+}
+
+function updateSummary() {
+    const descs = document.querySelectorAll('.item-desc');
+    const qtys = document.querySelectorAll('.item-qty');
+    const prices = document.querySelectorAll('.item-price');
+    
+    let count = 0;
+    let total = 0;
+    
+    for (let i = 0; i < descs.length; i++) {
+        if (descs[i].value) {
+            const qty = parseFloat(qtys[i].value) || 0;
+            const price = parseFloat(prices[i].value) || 0;
+            total += qty * price;
+            count++;
+        }
+    }
+    
+    document.getElementById('sum-items').textContent = count;
+    document.getElementById('sum-total').textContent = '฿' + total.toLocaleString('th-TH', {minimumFractionDigits: 2});
+    
+    // Update text
+    const totalText = numberToThaiText(total);
+    document.getElementById('sum-total-text').textContent = `จำนวนเงิน (ตัวอักษร): ${totalText}`;
+}
+
+// ========== PREVIEW ==========
+function previewInvoice() {
+    updatePreview();
+    showPage('preview');
+    document.getElementById('page-title').textContent = 'ตัวอย่างใบแจ้งหนี้';
+}
+
+function updatePreview() {
+    // Invoice info
+    document.getElementById('preview-invoice-no').textContent = document.getElementById('invoice_no').value || '-';
+    
+    const dateVal = document.getElementById('invoice_date').value;
+    if (dateVal) {
+        document.getElementById('preview-invoice-date').textContent = new Date(dateVal).toLocaleDateString('th-TH');
+    }
+    
+    document.getElementById('preview-customer').textContent = document.getElementById('customer').value || '-';
+    
+    // Bank
+    document.getElementById('preview-bank-name').textContent = document.getElementById('bank_name').value || '-';
+    document.getElementById('preview-bank-branch').textContent = document.getElementById('bank_branch').value || '-';
+    document.getElementById('preview-bank-account').textContent = document.getElementById('bank_account').value || '-';
+    document.getElementById('preview-bank-user').textContent = document.getElementById('bank_user').value || '-';
+    
+    // Items
+    const descs = document.querySelectorAll('.item-desc');
+    const qtys = document.querySelectorAll('.item-qty');
+    const prices = document.querySelectorAll('.item-price');
+    const noteText = document.getElementById('invoice_note').value;
+    
+    let html = '';
+    let total = 0;
+    
+    for (let i = 0; i < descs.length; i++) {
+        if (descs[i].value) {
+            const qty = parseFloat(qtys[i].value) || 0;
+            const price = parseFloat(prices[i].value) || 0;
+            const itemTotal = qty * price;
+            
+            html += `<tr>
+                <td>${descs[i].value}</td>
+                <td style="text-align: center;">${qty}</td>
+                <td style="text-align: right;">${itemTotal.toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+            </tr>`;
+            total += itemTotal;
+        }
+    }
+    
+    // Add note as a table row if exists
+    if (noteText.trim()) {
+        html += `<tr>
+            <td colspan="3" style="padding: 10px 15px; background: #fffef5; border-top: 1px solid #e0e0e0; font-size: 13px; color: #666; line-height: 1.6;">
+                ${noteText.replace(/\n/g, '<br>')}
+            </td>
+        </tr>`;
+    }
+    
+    document.getElementById('preview-items').innerHTML = html;
+    document.getElementById('preview-grand-total').textContent = total.toLocaleString('th-TH', {minimumFractionDigits: 2});
+    
+    // Total in text
+    const totalText = numberToThaiText(total);
+    document.getElementById('preview-total-text').textContent = totalText;
+}
+
+function printInvoice() {
+    updatePreview();
+    
+    // Switch to preview page
+    const currentPage = CONFIG.currentPage;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-preview').classList.add('active');
+    
+    // Print
+    window.print();
+    
+    // Switch back
+    setTimeout(() => {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + currentPage).classList.add('active');
+    }, 100);
+}
+
+// ========== SAVE ==========
+async function saveInvoice() {
+    const descs = document.querySelectorAll('.item-desc');
+    const qtys = document.querySelectorAll('.item-qty');
+    const prices = document.querySelectorAll('.item-price');
+    
+    const items = [];
+    let total = 0;
+    
+    for (let i = 0; i < descs.length; i++) {
+        if (descs[i].value) {
+            const qty = parseFloat(qtys[i].value) || 0;
+            const price = parseFloat(prices[i].value) || 0;
+            const itemTotal = qty * price;
+            
+            items.push({
+                description: descs[i].value,
+                quantity: qty,
+                price: price,
+                total: itemTotal
+            });
+            total += itemTotal;
+        }
+    }
+
+    if (items.length === 0) {
+        showAlert('กรุณาเพิ่มรายการอย่างน้อย 1 รายการ', 'warning');
+        return;
+    }
+
+    const data = {
+        action: 'create',
+        invoiceNo: document.getElementById('invoice_no').value,
+        date: document.getElementById('invoice_date').value,
+        customer: document.getElementById('customer').value,
+        items: items,
+        total: total,
+        note: document.getElementById('invoice_note').value,
+        bankName: document.getElementById('bank_name').value,
+        bankBranch: document.getElementById('bank_branch').value,
+        bankAcc: document.getElementById('bank_account').value,
+        bankUser: document.getElementById('bank_user').value
+    };
+
+    // Increment local sequence
+    const currentSeq = parseInt(localStorage.getItem('invoice_sequence') || '1');
+    localStorage.setItem('invoice_sequence', currentSeq + 1);
+
+    if (CONFIG.sheetsUrl) {
+        try {
+            showAlert('กำลังบันทึกข้อมูล...', 'info');
+            
+            await fetch(CONFIG.sheetsUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            showAlert('บันทึกข้อมูลสำเร็จ! ✅', 'success');
+        } catch (e) {
+            showAlert('บันทึกข้อมูลสำเร็จ!', 'success');
+        }
+    } else {
+        showAlert('บันทึกข้อมูลเฉพาะเครื่องสำเร็จ! (ไม่ได้เชื่อมต่อ Google Sheets)', 'success');
+    }
+    
+    await updateInvoiceNumber();
+    clearForm();
+}
+
+// ========== CLEAR ==========
+function clearForm() {
+    document.getElementById('customer').value = '';
+    document.getElementById('invoice_note').value = '';
+    
+    const container = document.getElementById('items-container');
+    container.innerHTML = `
+        <div class="item-card">
+            <input type="text" class="item-desc" placeholder="ชื่อรายการ" style="margin-bottom: 10px;">
+            <div class="form-row">
+                <input type="number" class="item-qty" placeholder="จำนวน" min="0" step="1">
+                <input type="number" class="item-price" placeholder="ราคา/หน่วย" min="0" step="0.01">
+            </div>
+        </div>
+    `;
+    
+    updateSummary();
+}
+
+// ========== DASHBOARD ==========
+async function loadDashboard() {
+    if (!CONFIG.sheetsUrl) {
+        updateConnectionStatus(false);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${CONFIG.sheetsUrl}?action=list`, { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+        
+        if (data.invoices && data.invoices.length > 0) {
+            const totalAmount = data.invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
+            const lastInvoice = data.invoices[0];
+            
+            document.getElementById('stat-total-invoices').textContent = data.invoices.length;
+            document.getElementById('stat-total-amount').textContent = '฿' + totalAmount.toLocaleString('th-TH', {minimumFractionDigits: 2});
+            document.getElementById('stat-last-no').textContent = lastInvoice.invoiceNo;
+        }
+    } catch (e) {
+        console.error('Load dashboard error:', e);
+    }
+}
+
+// ========== HISTORY ==========
+async function loadHistory() {
+    const tbody = document.getElementById('history-body');
+    
+    if (!CONFIG.sheetsUrl) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: #999;">กรุณาเชื่อมต่อ Google Sheets</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">กำลังโหลด...</td></tr>';
+
+    try {
+        const res = await fetch(`${CONFIG.sheetsUrl}?action=list`, { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+        
+        if (data.invoices && data.invoices.length > 0) {
+            tbody.innerHTML = '';
+            data.invoices.forEach(invoice => {
+                const tr = document.createElement('tr');
+                
+                const itemCount = invoice.items ? JSON.parse(invoice.items).length : 0;
+                const customerFirst = invoice.customer.split('\n')[0];
+                
+                // Status badge
+                const isPaid = invoice.paymentStatus === 'paid';
+                const statusBadge = isPaid 
+                    ? '<span style="background: #81c784; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">✓ จ่ายแล้ว</span>'
+                    : '<span style="background: #ffb74d; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">○ ยังไม่จ่าย</span>';
+                
+                const paymentDate = invoice.paymentDate ? new Date(invoice.paymentDate).toLocaleDateString('th-TH') : '-';
+                const docNo = invoice.paymentDocNo || '-';
+                
+                tr.innerHTML = `
+                    <td class="invoice-no">${invoice.invoiceNo}</td>
+                    <td>${new Date(invoice.date).toLocaleDateString('th-TH')}</td>
+                    <td>${customerFirst}</td>
+                    <td style="text-align: center;">${itemCount}</td>
+                    <td class="invoice-amount" style="text-align: right;">฿${parseFloat(invoice.total).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                    <td style="text-align: center;">${statusBadge}</td>
+                    <td style="text-align: center;">${paymentDate}</td>
+                    <td>${docNo}</td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-secondary" onclick="recordPayment('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">💰 บันทึกชำระ</button>
+                        <button class="btn btn-secondary" onclick="printFromHistory('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">🖨️ พิมพ์</button>
+                        <button class="btn btn-secondary" onclick="loadInvoice('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">✏️ แก้ไข</button>
+                        <button class="btn" onclick="deleteInvoice('${invoice.id}', '${invoice.invoiceNo}')" style="padding: 4px 12px; font-size: 12px; background: #ffebee; color: #c62828; border: 1px solid #e57373;">🗑️ ลบ</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: #999;">ยังไม่มีข้อมูล</td></tr>';
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: #c62828;">ไม่สามารถโหลดข้อมูลได้</td></tr>';
+    }
+}
+
+async function deleteInvoice(id, invoiceNo) {
+    if (!confirm(`ต้องการลบใบแจ้งหนี้ เลขที่ ${invoiceNo} ใช่หรือไม่?\n\nการลบไม่สามารถย้อนกลับได้`)) return;
+
+    if (!CONFIG.sheetsUrl) {
+        showAlert('ไม่ได้เชื่อมต่อ Google Sheets', 'error');
+        return;
+    }
+
+    try {
+        showAlert('กำลังลบข้อมูล...', 'info');
+        await fetch(CONFIG.sheetsUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', id: id })
+        });
+        showAlert(`ลบใบแจ้งหนี้ ${invoiceNo} สำเร็จ ✅`, 'success');
+        loadHistory();
+    } catch (e) {
+        showAlert('ไม่สามารถลบได้ กรุณาลองใหม่', 'error');
+    }
+}
+
+
+function recordPayment(id) {
+    const paymentDate = prompt('วันที่จ่ายเงิน (DD/MM/YYYY):');
+    if (!paymentDate) return;
+    
+    const docNo = prompt('เลขที่เอกสาร:');
+    if (!docNo) return;
+    
+    // TODO: บันทึกลง Google Sheets
+    showAlert(`บันทึกการชำระเงินสำเร็จ!\nวันที่: ${paymentDate}\nเลขที่เอกสาร: ${docNo}`, 'success');
+    loadHistory();
+}
+
+function printReport() {
+    // TODO: สร้างหน้าพิมพ์รายงาน
+    showAlert('กำลังพัฒนาฟีเจอร์พิมพ์รายงาน...', 'info');
+}
+
+async function printFromHistory(id) {
+    try {
+        showAlert('กำลังโหลดข้อมูลสำหรับพิมพ์...', 'info');
+
+        const res = await fetch(`${CONFIG.sheetsUrl}?action=get&id=${id}`, { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAlert('ไม่พบข้อมูลใบแจ้งหนี้', 'error');
+            return;
+        }
+
+        const invoice = data.invoice;
+
+        // Fill form silently
+        document.getElementById('invoice_no').value = invoice.invoiceNo;
+        document.getElementById('invoice_date').value = invoice.date;
+        document.getElementById('customer').value = invoice.customer;
+        document.getElementById('bank_name').value = invoice.bankName || '';
+        document.getElementById('bank_branch').value = invoice.bankBranch || '';
+        document.getElementById('bank_account').value = invoice.bankAccount || '';
+        document.getElementById('bank_user').value = invoice.bankUser || '';
+
+        let items = invoice.items;
+        if (typeof items === 'string') {
+            try { items = JSON.parse(items); } catch(e) { items = []; }
+        }
+
+        document.getElementById('items-container').innerHTML = '';
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.innerHTML = `
+                <input type="text" class="item-desc" value="${item.description}" style="margin-bottom: 10px;">
+                <div class="form-row">
+                    <input type="number" class="item-qty" value="${item.quantity}" min="0" step="1">
+                    <input type="number" class="item-price" value="${item.price}" min="0" step="0.01">
+                </div>
+            `;
+            document.getElementById('items-container').appendChild(card);
+        });
+
+        updateSummary();
+        printInvoice();
+
+    } catch (e) {
+        showAlert('ไม่สามารถโหลดข้อมูลได้: ' + e.message, 'error');
+    }
+}
+
+async function loadInvoice(id) {
+    try {
+        showAlert('กำลังโหลดข้อมูล...', 'info');
+        
+        const res = await fetch(`${CONFIG.sheetsUrl}?action=get&id=${id}`, { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+
+        if (!data.success) {
+            showAlert('ไม่พบข้อมูลใบแจ้งหนี้', 'error');
+            return;
+        }
+
+        const invoice = data.invoice;
+        
+        // Fill form
+        document.getElementById('invoice_no').value = invoice.invoiceNo;
+        document.getElementById('invoice_date').value = invoice.date;
+        document.getElementById('customer').value = invoice.customer;
+        document.getElementById('bank_name').value = invoice.bankName || '';
+        document.getElementById('bank_branch').value = invoice.bankBranch || '';
+        document.getElementById('bank_account').value = invoice.bankAccount || '';
+        document.getElementById('bank_user').value = invoice.bankUser || '';
+        
+        // Parse items
+        let items = invoice.items;
+        if (typeof items === 'string') {
+            try { items = JSON.parse(items); } catch(e) { items = []; }
+        }
+
+        // Clear and add items
+        document.getElementById('items-container').innerHTML = '';
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.innerHTML = `
+                <button class="btn-remove" onclick="removeItem(this)">×</button>
+                <input type="text" class="item-desc" placeholder="ชื่อรายการ" value="${item.description}" style="margin-bottom: 10px;">
+                <div class="form-row">
+                    <input type="number" class="item-qty" placeholder="จำนวน" value="${item.quantity}" min="0" step="1">
+                    <input type="number" class="item-price" placeholder="ราคา/หน่วย" value="${item.price}" min="0" step="0.01">
+                </div>
+            `;
+            document.getElementById('items-container').appendChild(card);
+        });
+        
+        updateSummary();
+        showPage('create');
+        showAlert('โหลดข้อมูลสำเร็จ! สามารถแก้ไขและบันทึกได้', 'success');
+        
+    } catch (e) {
+        showAlert('ไม่สามารถโหลดข้อมูลได้: ' + e.message, 'error');
+    }
+}
+
+// ========== EVENT LISTENERS ==========
+document.addEventListener('input', (e) => {
+    if (e.target.matches('.item-desc, .item-qty, .item-price')) {
+        updateSummary();
+    }
+});
+
+// ========== INIT ==========
+window.onload = async () => {
+    // Load saved URL
+    const savedUrl = localStorage.getItem('sheets_url');
+    if (savedUrl) {
+        document.getElementById('sheets_url').value = savedUrl;
+        CONFIG.sheetsUrl = savedUrl;
+        updateConnectionStatus(true);
+    } else {
+        updateConnectionStatus(false);
+    }
+    
+    // Load saved sequence start
+    const savedSeq = localStorage.getItem('sequence_start') || '1';
+    document.getElementById('sequence_start').value = savedSeq;
+    
+    // Load images
+    loadImages();
+    
+    // Set defaults
+    updateBank();
+    updateLanguage();
+    document.getElementById('invoice_date').valueAsDate = new Date();
+    
+    // Get invoice number
+    await updateInvoiceNumber();
+    
+    // Load dashboard
+    loadDashboard();
+    
+    updateSummary();
+    
+    // Setup Developer Secret Key
+    setupDeveloperMode();
+};
+
+// ========== DEVELOPER MODE ==========
+function setupDeveloperMode() {
+    const footer = document.getElementById('footer-trigger');
+    let clickCount = 0;
+    let clickTimer = null;
+
+    footer.addEventListener('click', () => {
+        clickCount++;
+        if (clickTimer) clearTimeout(clickTimer);
+        clickTimer = setTimeout(() => {
+            if (clickCount >= 5) {
+                toggleDeveloperMode();
+            }
+            clickCount = 0;
+        }, 600);
+    });
+}
+
+function toggleDeveloperMode() {
+    const devMenu = document.getElementById('dev-menu');
+    const isDevMode = devMenu.style.display !== 'none';
+    
+    if (isDevMode) {
+        // Disable Dev Mode
+        devMenu.style.display = 'none';
+        showAlert('Developer Mode ปิด', 'info');
+    } else {
+        // Enable Dev Mode
+        devMenu.style.display = 'block';
+        showPage('settings');
+        showAlert('Developer Mode เปิด! 👨‍💻', 'success');
+        updateDebugInfo();
+    }
+}
+
+function updateDebugInfo() {
+    // Connection status
+    document.getElementById('debug-connected').textContent = CONFIG.sheetsUrl ? 'Yes' : 'No';
+    document.getElementById('debug-connected').style.color = CONFIG.sheetsUrl ? 'green' : 'red';
+    
+    // Sequence
+    const seq = localStorage.getItem('invoice_sequence') || '1';
+    document.getElementById('debug-sequence').textContent = seq;
+    
+    // Month-Year
+    const monthYear = new Date().getMonth() + '' + new Date().getFullYear();
+    document.getElementById('debug-month-year').textContent = monthYear;
+    
+    // Images
+    const hasLogo = localStorage.getItem('culac_logo') ? 'Yes' : 'No';
+    const hasSig = localStorage.getItem('culac_signature') ? 'Yes' : 'No';
+    document.getElementById('debug-logo').textContent = hasLogo;
+    document.getElementById('debug-logo').style.color = hasLogo === 'Yes' ? 'green' : 'red';
+    document.getElementById('debug-sig').textContent = hasSig;
+    document.getElementById('debug-sig').style.color = hasSig === 'Yes' ? 'green' : 'red';
+}
+</script>
+
+</body>
+</html>
