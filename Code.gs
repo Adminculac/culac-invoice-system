@@ -71,7 +71,22 @@ function getSheet_() {
     sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
     sh.setFrozenRows(1);
   }
+  ensureHeaders_(sh);
   return sh;
+}
+
+// เพิ่มคอลัมน์ที่จำเป็นต่อท้าย ถ้าชีตเดิมยังไม่มี (เช่น PaymentStatus/PaymentDate/PaymentDocNo)
+function ensureHeaders_(sh) {
+  var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+  var existing = {};
+  for (var i = 0; i < headers.length; i++) existing[String(headers[i]).trim()] = true;
+  var missing = [];
+  for (var j = 0; j < HEADERS.length; j++) {
+    if (!existing[HEADERS[j]]) missing.push(HEADERS[j]);
+  }
+  if (missing.length > 0) {
+    sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
 }
 
 function getHeaderMap_(sh) {
