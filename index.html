@@ -1903,6 +1903,7 @@ async function loadDashboard() {
     try {
         const res = await fetch(`${CONFIG.sheetsUrl}?action=list`, { method: 'GET', mode: 'cors' });
         const data = await res.json();
+        updateConnectionStatus(true);  // ดึงข้อมูลสำเร็จ = เชื่อมต่อแล้วจริง
         
         if (data.invoices && data.invoices.length > 0) {
             const totalAmount = data.invoices.reduce((sum, inv) => sum + parseFloat(inv.total || 0), 0);
@@ -1913,6 +1914,7 @@ async function loadDashboard() {
             document.getElementById('stat-last-no').textContent = String(lastInvoice.invoiceNo).padStart(6, '0');
         }
     } catch (e) {
+        updateConnectionStatus(false);  // ดึงข้อมูลไม่ได้ = เชื่อมต่อไม่ได้จริง
         console.error('Load dashboard error:', e);
     }
 }
@@ -2134,10 +2136,9 @@ window.onload = async () => {
     if (savedUrl) {
         document.getElementById('sheets_url').value = savedUrl;
         CONFIG.sheetsUrl = savedUrl;
-        updateConnectionStatus(true);
-    } else {
-        updateConnectionStatus(false);
     }
+    // สถานะเริ่มต้นอิงจาก CONFIG.sheetsUrl (รวม URL ที่ฝังไว้เป็นค่าเริ่มต้น) แล้ว loadDashboard จะยืนยันจริงอีกครั้ง
+    updateConnectionStatus(!!CONFIG.sheetsUrl);
     
     // Load saved sequence start
     const savedSeq = localStorage.getItem('sequence_start') || '1';
