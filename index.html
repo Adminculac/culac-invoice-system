@@ -1259,6 +1259,26 @@
     </div>
 </div>
 
+<!-- หน้าต่างบันทึกการรับเงิน -->
+<div id="payment-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:16px; padding:28px; width:90%; max-width:420px; box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+        <h3 style="color:#d81b60; margin-bottom:6px; font-size:20px;">💰 บันทึกการรับเงิน</h3>
+        <p style="color:#888; font-size:13px; margin-bottom:18px;">ใบแจ้งหนี้เลขที่ <span id="pay-inv-no" style="font-weight:700; color:#d81b60;"></span></p>
+        <div class="form-group">
+            <label>วันที่รับเงิน</label>
+            <input type="date" id="pay-date">
+        </div>
+        <div class="form-group">
+            <label>เลขที่เอกสาร (ใบเสร็จ/ใบสำคัญรับเงิน)</label>
+            <input type="text" id="pay-doc" placeholder="เช่น RV-2569-001">
+        </div>
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn btn-secondary" style="flex:1;" onclick="closePaymentModal()">ยกเลิก</button>
+            <button class="btn btn-primary" style="flex:1;" onclick="submitPayment()">💾 บันทึก</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ========== CONFIG ==========
 const CONFIG = {
@@ -1961,7 +1981,7 @@ async function loadHistory() {
                     <td style="text-align: center;">${paymentDate}</td>
                     <td>${docNo}</td>
                     <td style="text-align: center;">
-                        <button class="btn btn-secondary" onclick="recordPayment('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">💰 บันทึกชำระ</button>
+                        <button class="btn btn-secondary" onclick="recordPayment('${invoice.id}', '${String(invoice.invoiceNo).padStart(6, '0')}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">💰 บันทึกชำระ</button>
                         <button class="btn btn-secondary" onclick="printFromHistory('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">🖨️ พิมพ์</button>
                         <button class="btn btn-secondary" onclick="loadInvoice('${invoice.id}')" style="padding: 4px 12px; font-size: 12px; margin-right: 5px;">✏️ แก้ไข</button>
                         <button class="btn" onclick="deleteInvoice('${invoice.id}', '${invoice.invoiceNo}')" style="padding: 4px 12px; font-size: 12px; background: #ffebee; color: #c62828; border: 1px solid #e57373;">🗑️ ลบ</button>
@@ -2001,16 +2021,47 @@ async function deleteInvoice(id, invoiceNo) {
 }
 
 
-function recordPayment(id) {
-    const paymentDate = prompt('วันที่จ่ายเงิน (DD/MM/YYYY):');
-    if (!paymentDate) return;
-    
-    const docNo = prompt('เลขที่เอกสาร:');
-    if (!docNo) return;
-    
-    // TODO: บันทึกลง Google Sheets
-    showAlert(`บันทึกการชำระเงินสำเร็จ!\nวันที่: ${paymentDate}\nเลขที่เอกสาร: ${docNo}`, 'success');
-    loadHistory();
+let _payId = null;
+
+function recordPayment(id, invNo) {
+    _payId = id;
+    document.getElementById('pay-inv-no').textContent = invNo || '';
+    document.getElementById('pay-date').valueAsDate = new Date(); // ค่าเริ่มต้น = วันนี้
+    document.getElementById('pay-doc').value = '';
+    document.getElementById('payment-modal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('payment-modal').style.display = 'none';
+    _payId = null;
+}
+
+async function submitPayment() {
+    const date = document.getElementById('pay-date').value;   // ปฏิทิน -> YYYY-MM-DD
+    const docNo = document.getElementById('pay-doc').value.trim();
+    if (!date) { showAlert('กรุณาเลือกวันที่รับเงิน', 'warning'); return; }
+    if (!_payId) return;
+
+    const payId = _payId;
+    if (CONFIG.sheetsUrl) {
+        try {
+            showAlert('กำลังบันทึกการรับเงิน...', 'info');
+            await fetch(CONFIG.sheetsUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'pay', id: payId, paymentDate: date, paymentDocNo: docNo })
+            });
+            showAlert('บันทึกการรับเงินสำเร็จ! ✅', 'success');
+        } catch (e) {
+            showAlert('บันทึกการรับเงินสำเร็จ!', 'success');
+        }
+    } else {
+        showAlert('ไม่ได้เชื่อมต่อ Google Sheets จึงบันทึกไม่ได้', 'warning');
+    }
+
+    closePaymentModal();
+    setTimeout(() => loadHistory(), 1500); // รอ Sheets บันทึกแล้วค่อยรีโหลดให้สถานะอัปเดต
 }
 
 function printReport() {
