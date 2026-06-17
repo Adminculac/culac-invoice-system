@@ -2041,6 +2041,8 @@ async function printFromHistory(id) {
         document.getElementById('bank_account').value = invoice.bankAccount || '';
         document.getElementById('bank_user').value = invoice.bankUser || '';
 
+        document.getElementById('invoice_note').value = invoice.note || '';
+
         let items = invoice.items;
         if (typeof items === 'string') {
             try { items = JSON.parse(items); } catch(e) { items = []; }
@@ -2090,6 +2092,7 @@ async function loadInvoice(id) {
         document.getElementById('bank_branch').value = invoice.bankBranch || '';
         document.getElementById('bank_account').value = invoice.bankAccount || '';
         document.getElementById('bank_user').value = invoice.bankUser || '';
+        document.getElementById('invoice_note').value = invoice.note || '';
         
         // Parse items
         let items = invoice.items;
