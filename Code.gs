@@ -1,429 +1,285 @@
-// ========================================
-// CULAC Invoice System - Google Apps Script Backend
-// Version: 2.1 (Fixed queryString fallback)
-// Updated: June 2026
-// ========================================
+/**
+ * CULAC Invoice System - Google Apps Script Backend
+ * ตรงกับ index.html (เวอร์ชันแก้เลขรัน + ปรับ UI)
+ *
+ * วิธีใช้:
+ * 1) เปิด Google Sheet ที่ใช้เก็บข้อมูล (หรือสร้างใหม่)
+ * 2) Extensions > Apps Script > วางโค้ดนี้ทับของเดิม
+ * 3) Deploy > New deployment > Web app
+ *    - Execute as: Me
+ *    - Who has access: Anyone
+ * 4) คัดลอก URL (/exec) ไปวางในหน้า "ตั้งค่า" ของระบบ
+ *
+ * หมายเหตุ: ระบบจะสร้างชีต "Invoices" พร้อมหัวคอลัมน์ให้อัตโนมัติถ้ายังไม่มี
+ *           อ่าน/เขียนข้อมูลตาม "ชื่อหัวคอลัมน์" ไม่ใช่ตำแหน่ง จึงทนต่อการสลับคอลัมน์
+ */
 
-const SHEET_NAME = 'Invoices';
-const PAYMENT_SHEET = 'Payments';
+var SHEET_NAME = 'Invoices';
+var HEADERS = [
+  'ID', 'InvoiceNo', 'Date', 'Customer', 'Items', 'Total', 'Note',
+  'BankName', 'BankBranch', 'BankAccount', 'BankUser',
+  'PaymentStatus', 'PaymentDate', 'PaymentDocNo', 'CreatedAt'
+];
 
-// ========================================
-// Parse parameters with queryString fallback
-// ========================================
-function getParams(e) {
-  if (e && e.parameter && Object.keys(e.parameter).length > 0) {
-    return e.parameter;
-  }
-  // Fallback: parse queryString manually
-  if (e && e.queryString) {
-    const params = {};
-    e.queryString.split('&').forEach(function(pair) {
-      const parts = pair.split('=');
-      if (parts.length >= 1 && parts[0]) {
-        params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
-      }
-    });
-    return params;
-  }
-  return {};
-}
-
-// ========================================
-// doGet
-// ========================================
+// ---------- Routing ----------
 function doGet(e) {
+  var p = (e && e.parameter) ? e.parameter : {};
+  var action = p.action || 'test';
   try {
-    const params = getParams(e);
-    const action = params.action;
-
-    if (!action) {
-      return jsonOut({ success: false, error: 'Action parameter is required', debug: { queryString: e ? e.queryString : null, parameter: e ? e.parameter : null } });
-    }
-
     switch (action) {
-      case 'test':
-        return testConnection();
-      case 'list':
-        return getInvoiceList();
-      case 'get':
-        if (!params.id) return jsonOut({ success: false, error: 'ID parameter is required' });
-        return getInvoice(params.id);
-      case 'getNextNumber':
-        return getNextInvoiceNumber();
-      default:
-        return jsonOut({ success: false, error: 'Invalid action: ' + action });
+      case 'test':          return json({ success: true, message: 'Connection successful!', version: '3.0' });
+      case 'getNextNumber': return json({ success: true, nextNumber: getNextNumber_(p.month) });
+      case 'list':          return json({ success: true, invoices: listInvoices_() });
+      case 'get':           return json(getInvoice_(p.id));
+      default:              return json({ success: false, error: 'Unknown action: ' + action });
     }
-  } catch (error) {
-    Logger.log('Error in doGet: ' + error.toString());
-    return jsonOut({ success: false, error: 'Server error: ' + error.toString() });
+  } catch (err) {
+    return json({ success: false, error: String(err) });
   }
 }
 
-// ========================================
-// doPost
-// ========================================
 function doPost(e) {
+  var data = {};
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return jsonOut({ success: false, error: 'No POST data provided' });
-    }
-
-    const data = JSON.parse(e.postData.contents);
-    const action = data.action;
-
-    if (!action) return jsonOut({ success: false, error: 'Action is required in POST data' });
-
+    if (e && e.postData && e.postData.contents) data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return json({ success: false, error: 'Invalid JSON: ' + String(err) });
+  }
+  var action = data.action || '';
+  try {
     switch (action) {
-      case 'create':
-        return createInvoice(data);
-      case 'update':
-        return updateInvoice(data);
-      case 'delete':
-        return deleteInvoice(data);
-      case 'recordPayment':
-        return recordPayment(data);
-      default:
-        return jsonOut({ success: false, error: 'Invalid action: ' + action });
+      case 'create': return json(createInvoice_(data));
+      case 'delete': return json(deleteInvoice_(data.id));
+      case 'pay':    return json(payInvoice_(data));
+      default:       return json({ success: false, error: 'Unknown action: ' + action });
     }
-  } catch (error) {
-    Logger.log('Error in doPost: ' + error.toString());
-    return jsonOut({ success: false, error: 'Server error: ' + error.toString() });
+  } catch (err) {
+    return json({ success: false, error: String(err) });
   }
 }
 
-// ========================================
-// Helper
-// ========================================
-function jsonOut(obj) {
-  return ContentService.createTextOutput(JSON.stringify(obj))
+// ---------- Sheet helpers ----------
+function getSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(SHEET_NAME);
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sh.setFrozenRows(1);
+  }
+  if (sh.getLastRow() === 0) {
+    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function getHeaderMap_(sh) {
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var map = {};
+  for (var i = 0; i < headers.length; i++) map[String(headers[i]).trim()] = i;
+  return map;
+}
+
+// แปลงทุกแถวเป็น object ที่ฝั่ง HTML ใช้ (key เป็น camelCase)
+function listInvoices_() {
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var hmap = getHeaderMap_(sh);
+  var values = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  var out = [];
+  for (var r = 0; r < values.length; r++) {
+    out.push(rowToObject_(values[r], hmap));
+  }
+  out.reverse(); // ใบล่าสุดอยู่บนสุด (invoices[0])
+  return out;
+}
+
+function rowToObject_(row, hmap) {
+  function v(name) { return hmap[name] != null ? row[hmap[name]] : ''; }
+  return {
+    id:            v('ID'),
+    invoiceNo:     v('InvoiceNo'),
+    date:          v('Date'),
+    customer:      v('Customer'),
+    items:         v('Items'),         // เก็บเป็น JSON string
+    total:         v('Total'),
+    note:          v('Note'),
+    bankName:      v('BankName'),
+    bankBranch:    v('BankBranch'),
+    bankAccount:   v('BankAccount'),
+    bankUser:      v('BankUser'),
+    paymentStatus: v('PaymentStatus'),
+    paymentDate:   v('PaymentDate'),
+    paymentDocNo:  v('PaymentDocNo')
+  };
+}
+
+// ---------- Actions ----------
+function getInvoice_(id) {
+  if (!id) return { success: false, error: 'Missing id' };
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return { success: false, error: 'Not found' };
+  var hmap = getHeaderMap_(sh);
+  var values = sh.getRange(2, 1, last - 1, sh.getLastColumn()).getValues();
+  for (var r = 0; r < values.length; r++) {
+    if (String(values[r][hmap['ID']]) === String(id)) {
+      return { success: true, invoice: rowToObject_(values[r], hmap) };
+    }
+  }
+  return { success: false, error: 'Not found' };
+}
+
+function createInvoice_(d) {
+  var sh = getSheet_();
+  var hmap = getHeaderMap_(sh);
+  var id = 'INV' + new Date().getTime();
+  var itemsStr = (typeof d.items === 'string') ? d.items : JSON.stringify(d.items || []);
+
+  var record = {
+    'ID': id,
+    'InvoiceNo': d.invoiceNo || '',
+    'Date': d.date || '',
+    'Customer': d.customer || '',
+    'Items': itemsStr,
+    'Total': d.total || 0,
+    'Note': d.note || '',
+    'BankName': d.bankName || '',
+    'BankBranch': d.bankBranch || '',
+    // ฝั่ง HTML ส่งมาเป็น bankAcc แต่ตอนอ่านใช้ bankAccount -> รองรับทั้งคู่
+    'BankAccount': d.bankAccount || d.bankAcc || '',
+    'BankUser': d.bankUser || '',
+    'PaymentStatus': 'unpaid',
+    'PaymentDate': '',
+    'PaymentDocNo': '',
+    'CreatedAt': new Date()
+  };
+
+  var width = sh.getLastColumn();
+  var row = new Array(width).fill('');
+  for (var key in record) {
+    if (hmap[key] != null) row[hmap[key]] = record[key];
+  }
+  sh.appendRow(row);
+
+  // บังคับให้ช่องเลขที่เป็น "ข้อความ" เพื่อรักษาศูนย์นำหน้า เช่น 030669 ไม่ให้กลายเป็น 30669
+  if (hmap['InvoiceNo'] != null) {
+    sh.getRange(sh.getLastRow(), hmap['InvoiceNo'] + 1)
+      .setNumberFormat('@')
+      .setValue(record['InvoiceNo']);
+  }
+  return { success: true, id: id, invoiceNo: record['InvoiceNo'] };
+}
+
+function deleteInvoice_(id) {
+  if (!id) return { success: false, error: 'Missing id' };
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return { success: false, error: 'Not found' };
+  var hmap = getHeaderMap_(sh);
+  var ids = sh.getRange(2, hmap['ID'] + 1, last - 1, 1).getValues();
+  for (var r = 0; r < ids.length; r++) {
+    if (String(ids[r][0]) === String(id)) {
+      sh.deleteRow(r + 2);
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Not found' };
+}
+
+function payInvoice_(d) {
+  if (!d.id) return { success: false, error: 'Missing id' };
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return { success: false, error: 'Not found' };
+  var hmap = getHeaderMap_(sh);
+  var ids = sh.getRange(2, hmap['ID'] + 1, last - 1, 1).getValues();
+  for (var r = 0; r < ids.length; r++) {
+    if (String(ids[r][0]) === String(d.id)) {
+      var rowNum = r + 2;
+      if (hmap['PaymentStatus'] != null) sh.getRange(rowNum, hmap['PaymentStatus'] + 1).setValue('paid');
+      if (hmap['PaymentDate'] != null)   sh.getRange(rowNum, hmap['PaymentDate'] + 1).setValue(d.paymentDate || '');
+      if (hmap['PaymentDocNo'] != null)  sh.getRange(rowNum, hmap['PaymentDocNo'] + 1).setValue(d.paymentDocNo || '');
+      return { success: true };
+    }
+  }
+  return { success: false, error: 'Not found' };
+}
+
+/**
+ * นับเลขรันถัดไปของ "เดือนที่ระบุ" จากข้อมูลจริงในชีต (รันแยกอิสระแต่ละเดือน)
+ * รูปแบบเลข: SSMMYY  (SS=ลำดับ, MM=เดือน, YY=ปี พ.ศ. 2 หลักท้าย)
+ * @param {string} monthParam  MMYY ของเดือนที่ต้องการ เช่น "0669" (ถ้าไม่ส่งมา ใช้เดือนปัจจุบัน)
+ * คืนค่าลำดับถัดไป (จำนวนเต็ม) เช่น เดือนนั้นมีสูงสุด 03 -> คืน 4
+ */
+function getNextNumber_(monthParam) {
+  var suffix;
+  if (monthParam && /^\d{4}$/.test(String(monthParam))) {
+    suffix = String(monthParam);          // ใช้เดือนที่ฝั่งหน้าเว็บส่งมา (อิงวันที่ในเอกสาร)
+  } else {
+    var now = new Date();
+    var mm = ('0' + (now.getMonth() + 1)).slice(-2);
+    var yy = String(now.getFullYear() + 543).slice(-2);
+    suffix = mm + yy;                      // เดือนปัจจุบัน
+  }
+
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) return 1;
+
+  var hmap = getHeaderMap_(sh);
+  var nos = sh.getRange(2, hmap['InvoiceNo'] + 1, last - 1, 1).getValues();
+  var maxSeq = 0;
+  for (var r = 0; r < nos.length; r++) {
+    var no = String(nos[r][0]).trim();
+    // เทียบเฉพาะใบของเดือนนั้น (4 หลักท้ายตรงกัน) รองรับทั้งเลขที่มี/ไม่มีศูนย์นำหน้า
+    if (no.length >= 5 && no.slice(-4) === suffix) {
+      var seq = parseInt(no.slice(0, no.length - 4), 10);
+      if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+    }
+  }
+  return maxSeq + 1;
+}
+
+// ---------- Output ----------
+function json(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-// ========================================
-// Test Connection
-// ========================================
-function testConnection() {
-  return jsonOut({
-    success: true,
-    message: 'Connection successful!',
-    timestamp: new Date().toISOString(),
-    version: '2.1'
-  });
-}
+/**
+ * ===== เครื่องมือแปลงเลขเก่า (รันครั้งเดียว) =====
+ * วิธีใช้: ในหน้า Apps Script เลือกฟังก์ชัน "fixOldInvoiceNumbers" แล้วกด ▶ Run
+ * จะแปลงเลขที่ในคอลัมน์ InvoiceNo ให้เป็น 6 หลักเสมอ (เติมศูนย์นำหน้า) และเก็บเป็นข้อความ
+ * เช่น 30669 -> 030669, 10669 -> 010669, 20669 -> 020669 (100669 ที่ครบ 6 หลักอยู่แล้วไม่เปลี่ยน)
+ */
+function fixOldInvoiceNumbers() {
+  var sh = getSheet_();
+  var last = sh.getLastRow();
+  if (last < 2) {
+    Logger.log('ไม่มีข้อมูลให้แปลง');
+    return;
+  }
+  var hmap = getHeaderMap_(sh);
+  var col = hmap['InvoiceNo'] + 1;            // คอลัมน์ InvoiceNo (1-indexed)
+  var range = sh.getRange(2, col, last - 1, 1);
+  var values = range.getValues();
+  var fixed = 0;
 
-// ========================================
-// Invoice Functions
-// ========================================
-function createInvoice(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    setupInvoiceSheet(sheet);
+  for (var i = 0; i < values.length; i++) {
+    var raw = String(values[i][0]).trim();
+    if (raw === '') continue;                 // ข้ามช่องว่าง
+    var digits = raw.replace(/\D/g, '');       // เอาเฉพาะตัวเลข
+    if (digits === '') continue;
+    var padded = digits.padStart(6, '0');     // เติมศูนย์ให้ครบ 6 หลัก
+    if (padded !== raw) fixed++;
+    values[i][0] = padded;
   }
 
-  const id = Utilities.getUuid();
-  const timestamp = new Date().toISOString();
-
-  sheet.appendRow([
-    id,
-    data.invoiceNo,
-    data.date,
-    data.customer,
-    JSON.stringify(data.items),
-    data.total,
-    data.note || '',
-    data.bankName,
-    data.bankBranch,
-    data.bankAcc,
-    data.bankUser,
-    'unpaid',
-    '',
-    '',
-    timestamp
-  ]);
-
-  return jsonOut({ success: true, id: id, invoiceNo: data.invoiceNo });
-}
-
-function getInvoiceList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet || sheet.getLastRow() <= 1) {
-    return jsonOut({ success: true, invoices: [] });
-  }
-
-  const data = sheet.getDataRange().getValues();
-  const invoices = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    if (row[0]) {
-      invoices.push({
-        id: row[0],
-        invoiceNo: row[1],
-        date: row[2],
-        customer: row[3],
-        items: row[4],
-        total: row[5],
-        note: row[6] || '',
-        bankName: row[7],
-        bankBranch: row[8],
-        bankAccount: row[9],
-        bankUser: row[10],
-        paymentStatus: row[11] || 'unpaid',
-        paymentDate: row[12] || '',
-        paymentDocNo: row[13] || '',
-        createdAt: row[14]
-      });
-    }
-  }
-
-  invoices.sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
-
-  return jsonOut({ success: true, invoices: invoices });
-}
-
-function getInvoice(id) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) return jsonOut({ success: false, error: 'Sheet not found' });
-
-  const data = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === id) {
-      const row = data[i];
-      return jsonOut({
-        success: true,
-        invoice: {
-          id: row[0], invoiceNo: row[1], date: row[2], customer: row[3],
-          items: row[4], total: row[5], note: row[6] || '',
-          bankName: row[7], bankBranch: row[8], bankAccount: row[9], bankUser: row[10],
-          paymentStatus: row[11] || 'unpaid', paymentDate: row[12] || '',
-          paymentDocNo: row[13] || '', createdAt: row[14]
-        }
-      });
-    }
-  }
-
-  return jsonOut({ success: false, error: 'Invoice not found' });
-}
-
-function updateInvoice(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) return jsonOut({ success: false, error: 'Sheet not found' });
-
-  const sheetData = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < sheetData.length; i++) {
-    if (sheetData[i][0] === data.id) {
-      const row = i + 1;
-      sheet.getRange(row, 2).setValue(data.invoiceNo);
-      sheet.getRange(row, 3).setValue(data.date);
-      sheet.getRange(row, 4).setValue(data.customer);
-      sheet.getRange(row, 5).setValue(JSON.stringify(data.items));
-      sheet.getRange(row, 6).setValue(data.total);
-      sheet.getRange(row, 7).setValue(data.note || '');
-      sheet.getRange(row, 8).setValue(data.bankName);
-      sheet.getRange(row, 9).setValue(data.bankBranch);
-      sheet.getRange(row, 10).setValue(data.bankAcc);
-      sheet.getRange(row, 11).setValue(data.bankUser);
-      return jsonOut({ success: true, id: data.id });
-    }
-  }
-
-  return jsonOut({ success: false, error: 'Invoice not found' });
-}
-
-// ========================================
-// Delete Invoice
-// ========================================
-function deleteInvoice(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) return jsonOut({ success: false, error: 'Sheet not found' });
-
-  const sheetData = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < sheetData.length; i++) {
-    if (sheetData[i][0] === data.id) {
-      sheet.deleteRow(i + 1);
-      return jsonOut({ success: true, id: data.id });
-    }
-  }
-
-  return jsonOut({ success: false, error: 'Invoice not found' });
-}
-
-// ========================================
-// Payment Functions
-// ========================================
-function recordPayment(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  if (!sheet) return jsonOut({ success: false, error: 'Sheet not found' });
-
-  const sheetData = sheet.getDataRange().getValues();
-
-  for (let i = 1; i < sheetData.length; i++) {
-    if (sheetData[i][0] === data.id) {
-      const row = i + 1;
-      sheet.getRange(row, 12).setValue('paid');
-      sheet.getRange(row, 13).setValue(data.paymentDate);
-      sheet.getRange(row, 14).setValue(data.paymentDocNo);
-
-      logPayment({
-        id: data.id,
-        invoiceNo: sheetData[i][1],
-        paymentDate: data.paymentDate,
-        paymentDocNo: data.paymentDocNo,
-        amount: sheetData[i][5]
-      });
-
-      return jsonOut({ success: true, id: data.id });
-    }
-  }
-
-  return jsonOut({ success: false, error: 'Invoice not found' });
-}
-
-function logPayment(data) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName(PAYMENT_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(PAYMENT_SHEET);
-    setupPaymentSheet(sheet);
-  }
-
-  const timestamp = new Date().toISOString();
-  const user = Session.getActiveUser().getEmail();
-
-  sheet.appendRow([
-    data.id, data.invoiceNo, data.paymentDate,
-    data.paymentDocNo, data.amount, timestamp, user
-  ]);
-}
-
-// ========================================
-// Invoice Number Generator
-// ========================================
-function getNextInvoiceNumber() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
-
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear() + 543).slice(-2);
-  const currentMonthYear = month + year;
-
-  if (!sheet || sheet.getLastRow() <= 1) {
-    return jsonOut({ success: true, nextNumber: 1, invoiceNo: '01' + currentMonthYear });
-  }
-
-  const data = sheet.getDataRange().getValues();
-  let maxSequence = 0;
-
-  for (let i = 1; i < data.length; i++) {
-    const invoiceNo = String(data[i][1]);
-    if (invoiceNo && invoiceNo.length >= 6) {
-      const invoiceMonthYear = invoiceNo.slice(-4);
-      if (invoiceMonthYear === currentMonthYear) {
-        const sequence = parseInt(invoiceNo.substring(0, 2));
-        if (!isNaN(sequence) && sequence > maxSequence) {
-          maxSequence = sequence;
-        }
-      }
-    }
-  }
-
-  const nextSequence = maxSequence + 1;
-  const nextInvoiceNo = String(nextSequence).padStart(2, '0') + currentMonthYear;
-
-  return jsonOut({ success: true, nextNumber: nextSequence, invoiceNo: nextInvoiceNo });
-}
-
-// ========================================
-// Setup Functions
-// ========================================
-function setupInvoiceSheet(sheet) {
-  sheet.appendRow([
-    'ID', 'Invoice No', 'Date', 'Customer', 'Items (JSON)',
-    'Total', 'Note', 'Bank Name', 'Bank Branch', 'Bank Account',
-    'Bank User', 'Payment Status', 'Payment Date', 'Payment Doc No', 'Created At'
-  ]);
-  const headerRange = sheet.getRange('A1:O1');
-  headerRange.setBackground('#d81b60');
-  headerRange.setFontColor('white');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
-  sheet.setFrozenRows(1);
-  sheet.setColumnWidth(1, 100);
-  sheet.setColumnWidth(2, 100);
-  sheet.setColumnWidth(3, 100);
-  sheet.setColumnWidth(4, 200);
-  sheet.setColumnWidth(5, 300);
-  sheet.setColumnWidth(6, 100);
-  sheet.setColumnWidth(7, 200);
-  sheet.setColumnWidth(12, 100);
-  sheet.setColumnWidth(13, 100);
-  sheet.setColumnWidth(14, 120);
-}
-
-function setupPaymentSheet(sheet) {
-  sheet.appendRow([
-    'Invoice ID', 'Invoice No', 'Payment Date',
-    'Payment Doc No', 'Amount', 'Recorded At', 'Recorded By'
-  ]);
-  const headerRange = sheet.getRange('A1:G1');
-  headerRange.setBackground('#d81b60');
-  headerRange.setFontColor('white');
-  headerRange.setFontWeight('bold');
-  headerRange.setHorizontalAlignment('center');
-  sheet.setFrozenRows(1);
-  sheet.setColumnWidth(1, 100);
-  sheet.setColumnWidth(2, 100);
-  sheet.setColumnWidth(3, 100);
-  sheet.setColumnWidth(4, 120);
-  sheet.setColumnWidth(5, 100);
-  sheet.setColumnWidth(6, 150);
-  sheet.setColumnWidth(7, 200);
-}
-
-function setupSheets() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  let invoiceSheet = ss.getSheetByName(SHEET_NAME);
-  if (!invoiceSheet) {
-    invoiceSheet = ss.insertSheet(SHEET_NAME);
-    setupInvoiceSheet(invoiceSheet);
-    Logger.log('✅ Invoices sheet created');
-  } else {
-    Logger.log('ℹ️ Invoices sheet already exists');
-  }
-
-  let paymentSheet = ss.getSheetByName(PAYMENT_SHEET);
-  if (!paymentSheet) {
-    paymentSheet = ss.insertSheet(PAYMENT_SHEET);
-    setupPaymentSheet(paymentSheet);
-    Logger.log('✅ Payments sheet created');
-  } else {
-    Logger.log('ℹ️ Payments sheet already exists');
-  }
-
-  Logger.log('🎉 Setup completed successfully!');
-
-  SpreadsheetApp.getUi().alert(
-    'Setup Complete',
-    'CULAC Invoice System sheets have been set up successfully!\n\n' +
-    '✅ Invoices sheet\n✅ Payments sheet\n\n' +
-    'You can now deploy this as a Web App.',
-    SpreadsheetApp.getUi().ButtonSet.OK
-  );
+  range.setNumberFormat('@');                 // บังคับคอลัมน์เป็นข้อความ กันศูนย์หายอีก
+  range.setValues(values);
+  Logger.log('แปลงเลขเสร็จแล้ว: ปรับ ' + fixed + ' รายการ จากทั้งหมด ' + values.length + ' รายการ');
 }
