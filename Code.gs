@@ -1,20 +1,17 @@
 /**
- * CULAC Invoice System - Google Apps Script Backend
- * ตรงกับ index.html (เวอร์ชันแก้เลขรัน + ปรับ UI)
+ * CULAC Invoice System - Google Apps Script Backend (v3.1)
  *
- * วิธีใช้:
- * 1) เปิด Google Sheet ที่ใช้เก็บข้อมูล (หรือสร้างใหม่)
- * 2) Extensions > Apps Script > วางโค้ดนี้ทับของเดิม
- * 3) Deploy > New deployment > Web app
- *    - Execute as: Me
- *    - Who has access: Anyone
- * 4) คัดลอก URL (/exec) ไปวางในหน้า "ตั้งค่า" ของระบบ
+ * ★★★ สิ่งเดียวที่ต้องตั้งค่า: วาง "รหัสชีต" ในบรรทัด SHEET_ID ด้านล่าง ★★★
+ * รหัสชีตหาได้จาก URL ของ Google Sheet:
+ *   https://docs.google.com/spreadsheets/d/[ ตรงนี้คือรหัส ]/edit
+ * ตัวอย่าง: ถ้า URL เป็น .../d/1AbC2dEfGhIjK.../edit  ให้วาง  1AbC2dEfGhIjK...
  *
- * หมายเหตุ: ระบบจะสร้างชีต "Invoices" พร้อมหัวคอลัมน์ให้อัตโนมัติถ้ายังไม่มี
- *           อ่าน/เขียนข้อมูลตาม "ชื่อหัวคอลัมน์" ไม่ใช่ตำแหน่ง จึงทนต่อการสลับคอลัมน์
+ * ถ้าเว้นว่างไว้ ระบบจะพยายามใช้ชีตที่ผูกกับสคริปต์โดยตรง (เฉพาะกรณีสร้างจาก Extensions > Apps Script)
  */
 
-var SHEET_NAME = 'Invoices';
+var SHEET_ID = '1S4LEUjpYVWm3RG6AIwEfeWqXV1J2cm_rYNdCcuVsiDg';          // ← รหัสไฟล์ CULAC Invoice 2569 (ใส่ให้แล้ว)
+var SHEET_NAME = 'INVOICE';        // ← แท็บที่มีข้อมูลจริง
+
 var HEADERS = [
   'ID', 'InvoiceNo', 'Date', 'Customer', 'Items', 'Total', 'Note',
   'BankName', 'BankBranch', 'BankAccount', 'BankUser',
@@ -27,7 +24,8 @@ function doGet(e) {
   var action = p.action || 'test';
   try {
     switch (action) {
-      case 'test':          return json({ success: true, message: 'Connection successful!', version: '3.0' });
+      case 'test':          return json({ success: true, message: 'Connection successful!', version: '3.1' });
+      case 'debug':         return json(debugInfo_());
       case 'getNextNumber': return json({ success: true, nextNumber: getNextNumber_(p.month) });
       case 'list':          return json({ success: true, invoices: listInvoices_() });
       case 'get':           return json(getInvoice_(p.id));
@@ -59,14 +57,29 @@ function doPost(e) {
 }
 
 // ---------- Sheet helpers ----------
-function getSheet_() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SHEET_NAME);
-  if (!sh) {
-    sh = ss.insertSheet(SHEET_NAME);
-    sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
-    sh.setFrozenRows(1);
+function getSpreadsheet_() {
+  // เปิดด้วยรหัสชีตถ้ามี (ทำงานได้ทุกกรณี) ไม่งั้นใช้ชีตที่ผูกกับสคริปต์
+  if (SHEET_ID && String(SHEET_ID).trim() !== '') {
+    return SpreadsheetApp.openById(String(SHEET_ID).trim());
   }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function getSheet_() {
+  var ss = getSpreadsheet_();
+  if (!ss) throw new Error('ไม่พบ Google Sheet — กรุณาวางรหัสชีตในตัวแปร SHEET_ID');
+
+  var sh;
+  if (SHEET_NAME && String(SHEET_NAME).trim() !== '') {
+    sh = ss.getSheetByName(String(SHEET_NAME).trim());
+    if (!sh) {
+      sh = ss.insertSheet(String(SHEET_NAME).trim());
+    }
+  } else {
+    // เว้นว่าง = ใช้แท็บแรกของไฟล์ (แท็บที่มีข้อมูลเดิมอยู่)
+    sh = ss.getSheets()[0];
+  }
+
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, HEADERS.length).setValues([HEADERS]);
     sh.setFrozenRows(1);
@@ -75,14 +88,37 @@ function getSheet_() {
   return sh;
 }
 
+// คืนข้อมูลวินิจฉัย: เปิดชีตได้ไหม ชื่อไฟล์/แท็บ หัวคอลัมน์ จำนวนแถว — เรียกด้วย ?action=debug
+function debugInfo_() {
+  try {
+    var ss = getSpreadsheet_();
+    if (!ss) return { ok: false, error: 'getSpreadsheet returned null (ยังไม่ได้ใส่ SHEET_ID หรือสคริปต์ไม่ได้ผูกกับชีต)' };
+    var sheets = ss.getSheets().map(function (s) { return s.getName(); });
+    var sh = getSheet_();
+    var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
+    return {
+      ok: true,
+      spreadsheetName: ss.getName(),
+      tabsInFile: sheets,
+      usingTab: sh.getName(),
+      headerRow: headers,
+      dataRows: Math.max(sh.getLastRow() - 1, 0)
+    };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
 // เพิ่มคอลัมน์ที่จำเป็นต่อท้าย ถ้าชีตเดิมยังไม่มี (เช่น PaymentStatus/PaymentDate/PaymentDocNo)
 function ensureHeaders_(sh) {
   var headers = sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1)).getValues()[0];
   var existing = {};
-  for (var i = 0; i < headers.length; i++) existing[String(headers[i]).trim()] = true;
+  for (var i = 0; i < headers.length; i++) {
+    existing[String(headers[i]).replace(/\s+/g, '').trim()] = true;   // เทียบแบบไม่สนเว้นวรรค
+  }
   var missing = [];
   for (var j = 0; j < HEADERS.length; j++) {
-    if (!existing[HEADERS[j]]) missing.push(HEADERS[j]);
+    if (!existing[HEADERS[j].replace(/\s+/g, '')]) missing.push(HEADERS[j]);
   }
   if (missing.length > 0) {
     sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
@@ -92,7 +128,11 @@ function ensureHeaders_(sh) {
 function getHeaderMap_(sh) {
   var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   var map = {};
-  for (var i = 0; i < headers.length; i++) map[String(headers[i]).trim()] = i;
+  for (var i = 0; i < headers.length; i++) {
+    var raw = String(headers[i]).trim();
+    map[raw] = i;                                   // ชื่อเดิม
+    map[raw.replace(/\s+/g, '')] = i;               // ชื่อแบบไม่มีเว้นวรรค -> "Invoice No" = "InvoiceNo"
+  }
   return map;
 }
 

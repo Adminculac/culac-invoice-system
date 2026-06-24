@@ -1418,6 +1418,17 @@ async function testConnection() {
 }
 
 // ========== INVOICE NUMBER ==========
+// แปลงวันที่จากชีต (เช่น ISO 2026-03-29T17:00:00Z) ให้เป็นรูปแบบช่องวันที่ YYYY-MM-DD ตามเวลาท้องถิ่น
+function toDateInput(d) {
+    if (!d) return '';
+    const dt = new Date(d);
+    if (isNaN(dt.getTime())) return String(d).split('T')[0];
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, '0');
+    const day = String(dt.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
 function generateInvoiceNumber(seq = 1, dateStr) {
     // เดือน/ปี อิงจาก "วันที่ในเอกสาร" ไม่ใช่วันที่กดสร้าง
     const d = dateStr ? new Date(dateStr) : new Date();
@@ -2085,7 +2096,7 @@ async function printFromHistory(id) {
 
         // Fill form silently
         document.getElementById('invoice_no').value = invoice.invoiceNo;
-        document.getElementById('invoice_date').value = invoice.date;
+        document.getElementById('invoice_date').value = toDateInput(invoice.date);
         document.getElementById('customer').value = invoice.customer;
         document.getElementById('bank_name').value = invoice.bankName || '';
         document.getElementById('bank_branch').value = invoice.bankBranch || '';
@@ -2137,7 +2148,7 @@ async function loadInvoice(id) {
         
         // Fill form
         document.getElementById('invoice_no').value = invoice.invoiceNo;
-        document.getElementById('invoice_date').value = invoice.date;
+        document.getElementById('invoice_date').value = toDateInput(invoice.date);
         document.getElementById('customer').value = invoice.customer;
         document.getElementById('bank_name').value = invoice.bankName || '';
         document.getElementById('bank_branch').value = invoice.bankBranch || '';
