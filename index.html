@@ -589,8 +589,8 @@
         }
 
         .inv-logo img {
-            max-height: 160px;
-            max-width: 560px;
+            max-height: 55px !important;
+            max-width: 220px !important;
             width: auto;
             object-fit: contain;
             display: block;
@@ -682,6 +682,7 @@
 
         /* ========== PRINT ========== */
         @media print {
+            .inv-logo img { max-height: 55px !important; max-width: 220px !important; }
             * {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
@@ -1581,7 +1582,7 @@ function loadImages() {
         document.getElementById('logo-preview').src = logo;
         document.getElementById('logo-preview').style.display = 'block';
         document.getElementById('logo-box').classList.add('has-file');
-        document.getElementById('preview-logo').innerHTML = `<img src="${logo}" style="max-height:160px;max-width:560px;width:auto;object-fit:contain;">`;
+        document.getElementById('preview-logo').innerHTML = `<img src="${logo}" style="max-height:55px;max-width:220px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto;">`;
     }
     if (sig) {
         document.getElementById('sig-preview').src = sig;
@@ -1628,6 +1629,15 @@ function updateLanguage() {
     document.getElementById('lbl-proof').textContent = d.labelProof;
     document.getElementById('preview-signer-name').textContent = d.signerName;
     document.getElementById('preview-signer-pos').textContent = d.signerPos;
+
+    // refresh date format to match selected language
+    const dateVal = document.getElementById('invoice_date').value;
+    if (dateVal) {
+        const dateObj = new Date(dateVal);
+        document.getElementById('preview-invoice-date').textContent = (lang === 'en')
+            ? dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
 }
 
 // ========== NUMBER TO TEXT ==========
@@ -1759,7 +1769,11 @@ function updatePreview() {
     
     const dateVal = document.getElementById('invoice_date').value;
     if (dateVal) {
-        document.getElementById('preview-invoice-date').textContent = new Date(dateVal).toLocaleDateString('th-TH');
+        const previewLang = document.getElementById('language').value;
+        const dateObj = new Date(dateVal);
+        document.getElementById('preview-invoice-date').textContent = (previewLang === 'en')
+            ? dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+            : dateObj.toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
     }
     
     document.getElementById('preview-customer').textContent = document.getElementById('customer').value || '-';
