@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CULAC Invoice System v4</title>
+<title>CULAC Invoice System v5</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ================= BASE ================= */
@@ -75,12 +75,9 @@ table.list tr:hover td{background:#fff7fa}
 /* ================= DOCUMENT (A4) ================= */
 .doc-wrap{display:flex;justify-content:center}
 .doc{width:210mm;min-height:297mm;background:#fff;padding:16mm 18mm;box-shadow:0 8px 30px rgba(0,0,0,.15);color:#000;font-size:14px;position:relative}
-.doc-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid var(--pink);padding-bottom:10px}
-.doc-logo img{height:19mm;width:auto;max-width:70mm;object-fit:contain;display:block}
-.doc-org{flex:1}
-.doc-org .n1{font-size:16px;font-weight:700;color:var(--pink);line-height:1.3}
-.doc-org .n2{font-size:12.5px;font-weight:600;color:#000;line-height:1.3}
-.doc-org .ad{font-size:11.5px;color:#000;margin-top:4px;line-height:1.45}
+.doc-head{text-align:center;border-bottom:3px solid var(--pink);padding-bottom:9px}
+.doc-logo img{height:26mm;width:auto;max-width:120mm;object-fit:contain;display:inline-block}
+.doc-org .ad{font-size:12px;color:#000;margin-top:5px;line-height:1.5}
 .doc-title{display:flex;justify-content:space-between;align-items:flex-end;margin:14px 0 12px}
 .doc-title .t{font-size:30px;font-weight:700;color:var(--pink);letter-spacing:1px;line-height:1}
 .doc-title .t small{display:block;font-size:14px;letter-spacing:0;color:#000;font-weight:600;margin-top:3px}
@@ -119,7 +116,7 @@ table.dt tfoot .words td{border-top:0;font-size:13px;font-weight:600;padding-top
   .doc-wrap{display:block}
   .doc{box-shadow:none;width:210mm;min-height:297mm;page-break-after:always;margin:0}
   .doc *{color:#000}
-  .doc-org .n1,.doc-title .t,.doc-to .lbl,.doc-pay .lbl,.doc-note b{color:var(--pink)!important}
+  .doc-title .t,.doc-to .lbl,.doc-pay .lbl,.doc-note b{color:var(--pink)!important}
   table.dt th{color:#fff!important}
 }
 @media (max-width:900px){.sidebar{width:72px}.sb-head img,.sb-head .ver,.sb-foot,.menu button span{display:none}.g2,.g3,.g4{grid-template-columns:1fr}.item .grid{grid-template-columns:1fr 1fr}}
@@ -129,7 +126,7 @@ table.dt tfoot .words td{border-top:0;font-size:13px;font-weight:600;padding-top
 
 <!-- ================= SIDEBAR ================= -->
 <aside class="sidebar">
-  <div class="sb-head"><img id="sb-logo" alt="CULAC"><div class="ver">Invoice System v4</div></div>
+  <div class="sb-head"><img id="sb-logo" alt="CULAC"><div class="ver">Invoice System v5</div></div>
   <nav class="menu">
     <button id="m-dashboard" onclick="go('dashboard')">📊 <span>Dashboard</span></button>
     <button id="m-form" onclick="go('form')">📝 <span>สร้างใบแจ้งหนี้</span></button>
@@ -428,7 +425,7 @@ function docHTML(f,opts={}){ const L=T[f.language||'th'], lang=f.language||'th';
   const name=lang==='en'?SIGNER.nameEn:SIGNER.nameTh, pos=lang==='en'?SIGNER.posEn:SIGNER.posTh;
   const rows=(f.items||[]).map((it,i)=>`<tr><td class="c" style="width:34px">${i+1}</td><td>${esc(it.description)}</td><td class="c" style="width:88px;white-space:nowrap">${(Number(it.quantity)||0).toLocaleString('en-US')}${it.unit?' '+esc(it.unit):''}</td><td class="r" style="width:95px">${money(it.price)}</td><td class="r" style="width:110px">${money(it.total!=null?it.total:(it.quantity*it.price))}</td></tr>`).join('');
   return `${opts.paid?`<div class="watermark">${L.paid}</div>`:''}
-  <div class="doc-head"><div class="doc-logo"><img src="${logo}" alt=""></div><div class="doc-org"><div class="n1">${L.org1}</div><div class="n2">${L.org2}</div><div class="ad">${L.addr}</div></div></div>
+  <div class="doc-head"><div class="doc-logo"><img src="${logo}" alt=""></div><div class="doc-org"><div class="ad">${L.addr}</div></div></div>
   <div class="doc-title"><div class="t">${L.title}<small>${L.sub}</small></div><div class="doc-meta"><b>${L.no}</b> <span class="mono" style="font-weight:700">${esc(f.invoiceNo)}</span><br><b>${L.date}</b> ${fmtDate(f.date,lang)}${f.reference?`<br><b>${L.ref}</b> ${esc(f.reference)}`:''}</div></div>
   <div class="doc-to"><div class="lbl">${L.to}</div><div class="val">${esc(f.customer)||'-'}</div></div>
   <table class="dt"><thead><tr><th class="c">#</th><th>${L.cDesc}</th><th class="c">${L.cQty}</th><th class="r">${L.cUnit}</th><th class="r">${L.cAmt}</th></tr></thead><tbody>${rows}</tbody>
@@ -458,7 +455,7 @@ async function submitPay(){ const id=$('pay-id').value, d=$('pay-date').value, d
   await apiPost({action:'pay',id,paymentDate:d,paymentDocNo:doc}); closePay(); alertMsg('บันทึกการรับเงินแล้ว ✅','ok'); await new Promise(r=>setTimeout(r,1200)); await loadAll(); }
 function printReport(){ const q=($('q').value||'').toLowerCase(), st=$('q-status').value; const rows=INVOICES.filter(i=>(!st||i.paymentStatus===st)&&(!q||i.invoiceNo.includes(q)||i.customer.toLowerCase().includes(q)||i.ref.toLowerCase().includes(q)));
   const tot=rows.reduce((s,i)=>s+i.total,0);
-  $('doc').innerHTML=`<div class="doc-head"><div class="doc-logo"><img src="${localStorage.getItem('culac_logo')||DEFAULT_LOGO}"></div><div class="doc-org"><div class="n1">${T.th.org1}</div><div class="n2">รายงานใบแจ้งหนี้ ${st==='paid'?'(ชำระแล้ว)':st==='unpaid'?'(ค้างชำระ)':'(ทั้งหมด)'}</div><div class="ad">พิมพ์เมื่อ ${fmtDate(toISO(new Date()),'th')} | จำนวน ${rows.length} รายการ</div></div></div>
+  $('doc').innerHTML=`<div class="doc-head"><div class="doc-logo"><img src="${localStorage.getItem('culac_logo')||DEFAULT_LOGO}"></div><div class="doc-org"><div class="ad" style="font-size:15px;font-weight:700;color:var(--pink)">รายงานใบแจ้งหนี้ ${st==='paid'?'(ชำระแล้ว)':st==='unpaid'?'(ค้างชำระ)':'(ทั้งหมด)'}</div><div class="ad">พิมพ์เมื่อ ${fmtDate(toISO(new Date()),'th')} | จำนวน ${rows.length} รายการ</div></div></div>
   <table class="dt" style="margin-top:14px"><thead><tr><th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th><th>อ้างอิง</th><th class="r">ยอดรวม</th><th class="c">สถานะ</th><th>วันที่รับเงิน</th><th>เลขที่เอกสาร</th></tr></thead><tbody>
   ${rows.map(i=>`<tr><td class="mono">${i.invoiceNo}</td><td>${fmtDateShort(i.date)}</td><td>${esc(i.customer.split('\n')[0])}</td><td>${esc(i.ref)}</td><td class="r">${money(i.total)}</td><td class="c">${i.paymentStatus==='paid'?'ชำระแล้ว':'ค้างชำระ'}</td><td>${i.paymentDate?fmtDateShort(i.paymentDate):'-'}</td><td>${esc(i.paymentDocNo)||'-'}</td></tr>`).join('')}</tbody>
   <tfoot><tr><td colspan="4" class="r">รวมทั้งสิ้น</td><td class="r" style="color:var(--pink)">${money(tot)}</td><td colspan="3"></td></tr></tfoot></table>
